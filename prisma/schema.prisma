@@ -1,0 +1,372 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id               String           @id @default(cuid())
+  name             String
+  email            String           @unique
+  username         String?          @unique
+  phone            String?
+  passwordHash     String?
+  role             String           @default("CALLING_VOLUNTEER") // SUPER_ADMIN, COORDINATOR, CALLING_VOLUNTEER, RELATIONSHIP_VOLUNTEER
+  privileges       String?          // JSON array of custom permission overrides
+  active           Boolean          @default(true)
+  avatar           String?
+  lastLogin        DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  assignedPeople   Person[]         @relation("AssignedVolunteer")
+  relationshipPeople Person[]       @relation("RelationshipVolunteer")
+  callLogs         CallLog[]
+  followups        FollowupTask[]
+  callingTasks     CallingTask[]
+  attendanceLogged SessionAttendance[]
+  timelineEvents   TimelineEvent[]
+}
+
+model Person {
+  id                     String           @id @default(cuid())
+  fullName               String
+  mobile                 String           @unique
+  whatsappNumber         String?
+  email                  String?
+  area                   String?          // Chandkheda, Motera, Sabarmati, etc.
+  ageGroup               String?          // Youth (18-25), 26-35, 36-50, 50+
+  profession             String?
+  source                 String           @default("Reference") // Society Outreach, Book Distribution, Stall, Social Media, etc.
+  stage                  String           @default("New Person") // New Person, Contacted, Interested, Invited, Confirmed, Attended, Relationship Follow-up, Connected
+  
+  assignedVolunteerId    String?
+  assignedVolunteer      User?            @relation("AssignedVolunteer", fields: [assignedVolunteerId], references: [id])
+  
+  relationshipVolunteerId String?
+  relationshipVolunteer  User?            @relation("RelationshipVolunteer", fields: [relationshipVolunteerId], references: [id])
+  
+  tags                   String?          // comma separated or JSON string
+  notes                  String?
+  address                String?
+  firstVisitDate         DateTime?
+  japaDailyRounds        Int              @default(0)
+  spiritualMentor        String?
+  active                 Boolean          @default(true)
+  customData             String?          // JSON for dynamic custom fields
+  
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  timelineEvents         TimelineEvent[]
+  callLogs               CallLog[]
+  followupTasks          FollowupTask[]
+  whatsappLogs           WhatsAppLog[]
+  programParticipations  ProgramParticipation[]
+  courseEnrollments      CourseEnrollment[]
+  sessionAttendances     SessionAttendance[]
+  japaLogs               JapaLog[]
+  yatraParticipations    YatraParticipation[]
+
+  @@index([mobile])
+  @@index([stage])
+  @@index([area])
+  @@index([assignedVolunteerId])
+}
+
+model TimelineEvent {
+  id              String   @id @default(cuid())
+  personId        String
+  person          Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  eventType       String   // CALL, WHATSAPP, NOTE, PROGRAM_INVITE, PROGRAM_ATTEND, COURSE_ENROLL, COURSE_SESSION, JAPA_UPDATE, FOLLOWUP, MILESTONE
+  title           String
+  description     String?
+  metadata        String?  // JSON string
+  createdByUserId String?
+  createdByUser   User?    @relation(fields: [createdByUserId], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@index([personId])
+  @@index([eventType])
+}
+
+model CallingTask {
+  id           String    @id @default(cuid())
+  title        String
+  campaignType String    @default("GENERAL") // PROGRAM, COURSE, ABSENTEE, GENERAL
+  targetId     String?   // ProgramId or CourseId or BatchId
+  volunteerId  String
+  volunteer    User      @relation(fields: [volunteerId], references: [id])
+  status       String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  deadline     DateTime?
+  notes        String?
+  callLogs     CallLog[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([volunteerId])
+  @@index([status])
+}
+
+model CallLog {
+  id               String       @id @default(cuid())
+  personId         String
+  person           Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+  volunteerId      String
+  volunteer        User         @relation(fields: [volunteerId], references: [id])
+  taskId           String?
+  task             CallingTask? @relation(fields: [taskId], references: [id])
+  callType         String       @default("General Follow-up") // New Connection, Program Invitation, Program Reminder, Relationship Call, Post-Program Follow-up, Festival Greeting, Course Follow-up, Absent Student Follow-up
+  outcome          String       // CONNECTED, NO_ANSWER, CALL_BACK, INTERESTED, YES_WILL_ATTEND, MAYBE, NOT_INTERESTED, WRONG_NUMBER, DO_NOT_CONTACT
+  notes            String?
+  followUpDate     DateTime?
+  followUpPriority String?      @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  createdAt        DateTime     @default(now())
+
+  @@index([personId])
+  @@index([volunteerId])
+  @@index([outcome])
+}
+
+model FollowupTask {
+  id          String    @id @default(cuid())
+  personId    String
+  person      Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  volunteerId String
+  volunteer   User      @relation(fields: [volunteerId], references: [id])
+  type        String    @default("Calling") // Calling, WhatsApp, Program Invitation, Relationship Call, Post-Program, Course Follow-up, General
+  status      String    @default("PENDING") // PENDING, COMPLETED, RESCHEDULED, CANCELLED, NO_RESPONSE
+  dueDate     DateTime
+  priority    String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  remarks     String?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([personId])
+  @@index([volunteerId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model WhatsAppTemplate {
+  id            String        @id @default(cuid())
+  name          String
+  category      String        // PROGRAM_INVITE, COURSE_REMINDER, ABSENTEE_FOLLOWUP, FESTIVAL_GREETING, RELATIONSHIP, GENERAL
+  bodyText      String
+  variablesList String        // JSON array of variable names like ["name", "program_name", "date", "venue"]
+  active        Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  logs          WhatsAppLog[]
+}
+
+model WhatsAppLog {
+  id          String            @id @default(cuid())
+  personId    String
+  person      Person            @relation(fields: [personId], references: [id], onDelete: Cascade)
+  volunteerId String?
+  templateId  String?
+  template    WhatsAppTemplate? @relation(fields: [templateId], references: [id])
+  messageBody String
+  status      String            @default("SENT") // SENT, DELIVERED, CLICKED
+  createdAt   DateTime          @default(now())
+
+  @@index([personId])
+}
+
+model Program {
+  id             String                 @id @default(cuid())
+  title          String
+  programType    String                 @default("Bhagavad Gita Intro") // Bhagavad Gita Intro, Sunday Feast, Janmashtami Festival, Youth Seminar, Retreat
+  eventDate      DateTime
+  eventTime      String?                // e.g., "5:00 PM - 7:30 PM"
+  venue          String                 @default("Main Hall, Chandkheda Center")
+  description    String?
+  coordinatorId  String?
+  capacity       Int                    @default(500)
+  status         String                 @default("UPCOMING") // UPCOMING, COMPLETED, CANCELLED
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  participations ProgramParticipation[]
+}
+
+model ProgramParticipation {
+  id               String   @id @default(cuid())
+  programId        String
+  program          Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  personId         String
+  person           Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  invitationStatus String   @default("INVITED") // INVITED, SENT, CONFIRMED, MAYBE, NO_RESPONSE, NOT_INTERESTED
+  attendanceStatus String   @default("UNKNOWN") // UNKNOWN, ATTENDED, DID_NOT_ATTEND, WALK_IN, CANCELLED
+  reminderDone     Boolean  @default(false)
+  guestsCount      Int      @default(1)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([programId, personId])
+  @@index([programId])
+  @@index([personId])
+  @@index([invitationStatus])
+  @@index([attendanceStatus])
+}
+
+model Course {
+  id               String             @id @default(cuid())
+  title            String             // Gita Shiksha Course, Bhagavad Gita Level 1, etc.
+  courseType       String             @default("Spiritual Course")
+  startDate        DateTime
+  endDate          DateTime?
+  description      String?
+  coordinatorId    String?
+  facultyName      String?            @default("HG Radheshyam Das")
+  venue            String             @default("Main Hall, Chandkheda Center")
+  status           String             @default("ACTIVE") // ACTIVE, COMPLETED, UPCOMING
+  totalSessions    Int                @default(10)
+  customFormConfig String?            // JSON schema for custom registration questions
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  batches          CourseBatch[]
+  enrollments      CourseEnrollment[]
+}
+
+model CourseBatch {
+  id           String             @id @default(cuid())
+  courseId     String
+  course       Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  batchName    String             // Batch 1, Sunday Morning Batch, etc.
+  startDate    DateTime
+  scheduleInfo String?            // "Every Saturday 6:30 PM"
+  active       Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+
+  sessions     CourseSession[]
+  enrollments  CourseEnrollment[]
+
+  @@index([courseId])
+}
+
+model CourseSession {
+  id           String              @id @default(cuid())
+  batchId      String
+  batch        CourseBatch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sessionNumber Int
+  title        String              // "Session 1: Introduction to Bhagavad Gita"
+  sessionDate  DateTime
+  sessionTime  String?             // "6:30 PM"
+  venue        String?             @default("Main Hall, Chandkheda Center")
+  topicSummary String?
+  completed    Boolean             @default(false)
+  createdAt    DateTime            @default(now())
+
+  attendances  SessionAttendance[]
+
+  @@index([batchId])
+}
+
+model CourseEnrollment {
+  id                String              @id @default(cuid())
+  courseId          String
+  course            Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  batchId           String
+  batch             CourseBatch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  personId          String
+  person            Person              @relation(fields: [personId], references: [id], onDelete: Cascade)
+  enrollmentDate    DateTime            @default(now())
+  status            String              @default("ACTIVE") // ACTIVE, REGULAR, IRREGULAR, LOW_ATTENDANCE, COMPLETED, DISCONTINUED
+  attendancePercent Float               @default(0.0)
+  certificateIssued Boolean             @default(false)
+  receiptNumber     String?
+  notes             String?
+  customAnswers     String?             // JSON for answers to course registration questions
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  attendances       SessionAttendance[]
+
+  @@unique([batchId, personId])
+  @@index([courseId])
+  @@index([batchId])
+  @@index([personId])
+  @@index([status])
+}
+
+model SessionAttendance {
+  id               String           @id @default(cuid())
+  sessionId        String
+  session          CourseSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  enrollmentId     String
+  enrollment       CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  personId         String
+  person           Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  status           String           @default("PRESENT") // PRESENT, ABSENT, EXCUSED
+  quizScore        Int?
+  notes            String?
+  recordedByUserId String?
+  recordedByUser   User?            @relation(fields: [recordedByUserId], references: [id])
+  recordedAt       DateTime         @default(now())
+
+  @@unique([sessionId, personId])
+  @@index([sessionId])
+  @@index([enrollmentId])
+  @@index([personId])
+  @@index([status])
+}
+
+model JapaLog {
+  id               String   @id @default(cuid())
+  personId         String
+  person           Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  date             DateTime @default(now())
+  rounds           Int      @default(0)
+  remarks          String?
+  recordedByUserId String?
+  createdAt        DateTime @default(now())
+
+  @@index([personId])
+}
+
+model YatraParticipation {
+  id               String   @id @default(cuid())
+  personId         String
+  person           Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  yatraName        String   // Vrindavan Yatra 2026, Mayapur Parikrama, Jagannath Puri
+  yatraDate        DateTime
+  location         String
+  attendance       Boolean  @default(true)
+  notes            String?
+  recordedByUserId String?
+  createdAt        DateTime @default(now())
+
+  @@index([personId])
+}
+
+model SystemOption {
+  id          String   @id @default(cuid())
+  category    String   // STAGE, SOURCE, CALL_OUTCOME, FOLLOWUP_TYPE, PROGRAM_TYPE, TAG
+  label       String
+  value       String
+  color       String?
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+
+  @@index([category])
+}
+
+model CustomField {
+  id          String   @id @default(cuid())
+  entityType  String   @default("PERSON") // PERSON, COURSE, PROGRAM
+  fieldName   String
+  fieldLabel  String
+  fieldType   String   // TEXT, NUMBER, DATE, DROPDOWN, MULTI_SELECT, BOOLEAN, TEXTAREA
+  options     String?  // JSON array for dropdown options
+  required    Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+}
