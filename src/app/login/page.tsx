@@ -44,7 +44,7 @@ export default function LoginPage() {
         style={{
           backgroundImage: "url('/images/radha-govind-bg.jpg')",
           backgroundSize: "cover",
-          backgroundPosition: "center",
+          backgroundPosition: "center 15%",
           opacity: 0.55,
           filter: "contrast(115%) brightness(92%) saturate(115%)",
         }}
