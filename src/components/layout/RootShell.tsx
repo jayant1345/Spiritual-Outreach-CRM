@@ -82,7 +82,7 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
           style={{
             backgroundImage: "url('/images/radha-govind-app.jpg')",
             backgroundSize: "cover",
-            backgroundPosition: "center 20%",
+            backgroundPosition: "center 5%",
             backgroundAttachment: "fixed",
             opacity: 0.65,
             filter: "contrast(118%) brightness(78%) saturate(120%)",
