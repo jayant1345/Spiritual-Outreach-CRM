@@ -36,8 +36,15 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
   const [selectedPersonForWhatsApp, setSelectedPersonForWhatsApp] = useState<any>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1);
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!loading && !user && pathname !== "/login") {
@@ -90,11 +97,24 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
         />
 
 
-        <Sidebar onOpenAddPerson={() => setIsAddPersonOpen(true)} />
+        <Sidebar
+          onOpenAddPerson={() => setIsAddPersonOpen(true)}
+          mobileOpen={mobileNavOpen}
+          onCloseMobile={() => setMobileNavOpen(false)}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+        />
 
-        <div className="flex-1 ml-20 sm:ml-72 flex flex-col min-h-screen relative z-10">
-          <Header onOpenAddPerson={() => setIsAddPersonOpen(true)} />
-          <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto">{children}</main>
+        <div
+          className={`flex-1 flex flex-col min-h-screen relative z-10 transition-all duration-300 ml-0 ${
+            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
+          }`}
+        >
+          <Header
+            onOpenAddPerson={() => setIsAddPersonOpen(true)}
+            onOpenMobileMenu={() => setMobileNavOpen(true)}
+          />
+          <main className="flex-1 p-3.5 sm:p-8 max-w-7xl w-full mx-auto">{children}</main>
         </div>
 
         <AddPersonModal

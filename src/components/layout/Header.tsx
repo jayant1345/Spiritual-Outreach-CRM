@@ -1,19 +1,21 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Plus, Bell, MapPin, User, LogOut, ChevronDown, Shield, PhoneCall, HeartHandshake, CheckCircle2 } from "lucide-react";
+import { Search, Plus, Bell, MapPin, User, LogOut, ChevronDown, Shield, PhoneCall, HeartHandshake, CheckCircle2, Menu } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface HeaderProps {
   onOpenAddPerson?: () => void;
   onSearchChange?: (query: string) => void;
   searchQuery?: string;
+  onOpenMobileMenu?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenAddPerson,
   onSearchChange,
   searchQuery = "",
+  onOpenMobileMenu,
 }) => {
   const { user, logout, switchDemoUser } = useAuth();
   const [activeCenter, setActiveCenter] = useState("Chandkheda Center");
@@ -37,16 +39,28 @@ export const Header: React.FC<HeaderProps> = ({
   const badge = getRoleBadge(user?.role);
 
   return (
-    <header className="sticky top-0 z-20 h-16 bg-[#FAF8F5]/80 backdrop-blur-xl border-b border-[#E5D8B8] px-4 sm:px-8 flex items-center justify-between gap-4 shadow-sm shadow-[#08415C]/5">
+    <header className="sticky top-0 z-20 h-16 bg-[#FAF8F5]/85 backdrop-blur-xl border-b border-[#E5D8B8] px-3 sm:px-8 flex items-center justify-between gap-2.5 sm:gap-4 shadow-sm shadow-[#08415C]/5">
+      {/* Mobile Hamburger Drawer Trigger */}
+      {onOpenMobileMenu && (
+        <button
+          type="button"
+          onClick={onOpenMobileMenu}
+          className="lg:hidden p-2 rounded-xl bg-white border border-[#E5D8B8] text-[#08415C] hover:bg-[#08415C]/10 transition shadow-xs flex items-center justify-center flex-shrink-0"
+          title="Open Menu"
+          aria-label="Open Navigation Menu"
+        >
+          <Menu className="w-5 h-5 text-[#08415C]" />
+        </button>
+      )}
 
-      <div className="flex-1 max-w-xl relative">
+      <div className="flex-1 max-w-xl relative min-w-0">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#78909C]" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
-          placeholder="Universal search by Name, Mobile, Locality, Course..."
-          className="w-full pl-10 pr-12 py-2 bg-white border border-[#E5D8B8] rounded-xl text-xs sm:text-sm text-[#0B192C] placeholder-[#78909C] focus:outline-none focus:ring-2 focus:ring-[#08415C]/20 focus:border-[#08415C] shadow-sm transition"
+          placeholder="Search Name, Phone, Locality..."
+          className="w-full pl-9 sm:pl-10 pr-4 sm:pr-12 py-2 bg-white border border-[#E5D8B8] rounded-xl text-xs sm:text-sm text-[#0B192C] placeholder-[#78909C] focus:outline-none focus:ring-2 focus:ring-[#08415C]/20 focus:border-[#08415C] shadow-sm transition truncate"
         />
         <span className="hidden sm:inline absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-[#78909C] bg-[#FAF8F5] border border-[#E5D8B8] px-1.5 py-0.5 rounded">
           ⌘K
