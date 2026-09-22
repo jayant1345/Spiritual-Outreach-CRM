@@ -84,8 +84,8 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
             backgroundSize: "cover",
             backgroundPosition: "center 15%",
             backgroundAttachment: "fixed",
-            opacity: 0.48,
-            filter: "contrast(112%) brightness(96%) saturate(115%)",
+            opacity: 0.65,
+            filter: "contrast(118%) brightness(78%) saturate(120%)",
           }}
         />
 

@@ -45,8 +45,8 @@ export default function LoginPage() {
           backgroundImage: "url('/images/radha-govind-bg.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center 15%",
-          opacity: 0.55,
-          filter: "contrast(115%) brightness(92%) saturate(115%)",
+          opacity: 0.8,
+          filter: "contrast(122%) brightness(72%) saturate(125%)",
         }}
       />
       <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#08415C]/15 rounded-full blur-3xl pointer-events-none" />
