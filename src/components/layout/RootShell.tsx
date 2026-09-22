@@ -80,12 +80,12 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
         <div 
           className="fixed inset-0 pointer-events-none z-0 transition-opacity duration-700"
           style={{
-            backgroundImage: "url('/images/radha-govind-watermark.jpg')",
+            backgroundImage: "url('/images/radha-govind-app.jpg')",
             backgroundSize: "cover",
-            backgroundPosition: "center 30%",
+            backgroundPosition: "center 20%",
             backgroundAttachment: "fixed",
-            opacity: 0.7,
-            filter: "contrast(125%) brightness(65%) saturate(135%)",
+            opacity: 0.65,
+            filter: "contrast(118%) brightness(78%) saturate(120%)",
           }}
         />
 

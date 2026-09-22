@@ -42,11 +42,11 @@ export default function LoginPage() {
       <div
         className="fixed inset-0 pointer-events-none z-0"
         style={{
-          backgroundImage: "url('/images/radha-govind-watermark.jpg')",
+          backgroundImage: "url('/images/radha-govind-login.jpg')",
           backgroundSize: "cover",
-          backgroundPosition: "center 30%",
-          opacity: 0.85,
-          filter: "contrast(130%) brightness(58%) saturate(140%)",
+          backgroundPosition: "center 20%",
+          opacity: 0.8,
+          filter: "contrast(122%) brightness(72%) saturate(125%)",
         }}
       />
       <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#08415C]/15 rounded-full blur-3xl pointer-events-none" />
