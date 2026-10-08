@@ -20,6 +20,8 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<"export" | "import">("export");
   const [importing, setImporting] = useState(false);
+  const [batchTag, setBatchTag] = useState("");
+  const [customSource, setCustomSource] = useState("");
   const [importResult, setImportResult] = useState<{ imported: number; duplicates: number } | null>(null);
 
   const handleExportExcel = () => {
@@ -66,11 +68,15 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
         const ws = wb.Sheets[wsName];
         const rawData: any[] = XLSX.utils.sheet_to_json(ws);
 
-        // Send to backend import endpoint
+        // Send to backend import endpoint with batch tag & custom source
         const res = await fetch("/api/people/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ records: rawData }),
+          body: JSON.stringify({
+            records: rawData,
+            batchTag: batchTag.trim(),
+            customSource: customSource.trim(),
+          }),
         });
 
         const resData = await res.json();
@@ -151,6 +157,36 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
               <p className="text-[11px] text-[#B8860B]">
                 🛡️ System automatically prevents duplicate mobile numbers.
               </p>
+            </div>
+
+            {/* Batch & Campaign Optional Tagging */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white border border-[#E5D8B8] rounded-xl">
+              <div>
+                <label className="block text-[11px] font-bold text-[#08415C] uppercase mb-1">
+                  Batch / Campaign Tag (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={batchTag}
+                  onChange={(e) => setBatchTag(e.target.value)}
+                  placeholder="e.g. Youth Seminar Oct 2026"
+                  className="w-full px-3 py-1.5 bg-[#FAF8F5] border border-[#E5D8B8] rounded-lg text-xs outline-none focus:border-[#08415C]"
+                />
+                <span className="text-[10px] text-stone-400 mt-0.5 block">Tags all rows for batch filtering</span>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-[#08415C] uppercase mb-1">
+                  Lead Source (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={customSource}
+                  onChange={(e) => setCustomSource(e.target.value)}
+                  placeholder="e.g. Book Distribution, Seminar"
+                  className="w-full px-3 py-1.5 bg-[#FAF8F5] border border-[#E5D8B8] rounded-lg text-xs outline-none focus:border-[#08415C]"
+                />
+                <span className="text-[10px] text-stone-400 mt-0.5 block">Overrides column if specified</span>
+              </div>
             </div>
 
             <div className="border-2 border-dashed border-[#E5D8B8] hover:border-[#D4AF37] p-6 rounded-xl text-center bg-[#FAF8F5] transition">

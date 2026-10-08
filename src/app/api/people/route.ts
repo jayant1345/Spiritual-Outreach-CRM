@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     const stage = searchParams.get("stage") || "";
     const source = searchParams.get("source") || "";
     const volunteerId = searchParams.get("volunteerId") || "";
+    const tag = searchParams.get("tag") || searchParams.get("batch") || "";
 
     const where: any = {};
 
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
     if (area && area !== "ALL") where.area = { contains: area };
     if (stage && stage !== "ALL") where.stage = stage;
     if (source && source !== "ALL") where.source = source;
+    if (tag && tag !== "ALL") where.tags = { contains: tag };
 
     const people = await prisma.person.findMany({
       where,

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { CRMContext } from "@/components/layout/RootShell";
 import Badge from "@/components/common/Badge";
+import Modal from "@/components/common/Modal";
 import ImportExportModal from "@/components/people/ImportExportModal";
 import {
   Users,
@@ -44,6 +45,12 @@ export default function PeoplePage() {
   const [bulkVolunteerId, setBulkVolunteerId] = useState("");
   const [bulkStage, setBulkStage] = useState("");
   const [bulkActionProcessing, setBulkActionProcessing] = useState(false);
+
+  // Auto Split & Distribute States
+  const [isDistributeModalOpen, setIsDistributeModalOpen] = useState(false);
+  const [selectedVolunteersForSplit, setSelectedVolunteersForSplit] = useState<string[]>([]);
+  const [distributeBatchTag, setDistributeBatchTag] = useState("");
+  const [distributeAlert, setDistributeAlert] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPeople();
@@ -139,6 +146,40 @@ export default function PeoplePage() {
     }
   };
 
+  const handleAutoDistributeLeads = async () => {
+    if (selectedIds.length === 0 || selectedVolunteersForSplit.length === 0) return;
+    setBulkActionProcessing(true);
+    try {
+      const res = await fetch("/api/people/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: selectedIds,
+          action: "DISTRIBUTE_VOLUNTEERS",
+          value: selectedVolunteersForSplit,
+          batchTag: distributeBatchTag.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsDistributeModalOpen(false);
+        setDistributeAlert(
+          `Successfully distributed ${selectedIds.length} leads equally across ${selectedVolunteersForSplit.length} callers!${distributeBatchTag ? ` (Batch: ${distributeBatchTag})` : ""}`
+        );
+        setTimeout(() => setDistributeAlert(null), 6000);
+        setSelectedIds([]);
+        setSelectedVolunteersForSplit([]);
+        setDistributeBatchTag("");
+        fetchPeople();
+        fetchVolunteers();
+      }
+    } catch (err) {
+      console.error("Distribution error:", err);
+    } finally {
+      setBulkActionProcessing(false);
+    }
+  };
+
   // Instant Filtered Export (Docx Section 1.8 & 1.10)
   const handleExportFiltered = () => {
     const exportData = people.map((p, idx) => ({
@@ -203,6 +244,22 @@ export default function PeoplePage() {
           )}
         </div>
       </div>
+
+      {/* Alert Banner for Distribution */}
+      {distributeAlert && (
+        <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-2xl text-xs text-emerald-800 flex items-center justify-between shadow-xs animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <span className="text-base">✨</span>
+            <span className="font-semibold">{distributeAlert}</span>
+          </div>
+          <button
+            onClick={() => setDistributeAlert(null)}
+            className="text-stone-400 hover:text-stone-600 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Multi-Dimensional Filter Control Bar */}
       <div className="gold-card p-3 sm:p-4 space-y-3 shadow-xs">
@@ -361,6 +418,21 @@ export default function PeoplePage() {
                   Apply
                 </button>
               </div>
+            )}
+
+            {/* 1-Click Auto Split & Distribute */}
+            {hasPermission("calling:assign") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedVolunteersForSplit([]);
+                  setIsDistributeModalOpen(true);
+                }}
+                className="px-3 py-1.5 bg-[#00A896] hover:bg-[#028090] text-white rounded-lg text-[11px] font-bold shadow-xs flex items-center gap-1.5 transition"
+                title="Split selected leads equally across multiple callers with round-robin"
+              >
+                <span>⚡ Auto Split & Distribute</span>
+              </button>
             )}
 
             {/* Change Status */}
@@ -673,6 +745,132 @@ export default function PeoplePage() {
           setIsImportExportOpen(false);
         }}
       />
+
+      {/* Auto Split & Distribute Leads Modal */}
+      <Modal
+        isOpen={isDistributeModalOpen}
+        onClose={() => setIsDistributeModalOpen(false)}
+        title="⚡ Auto Split & Distribute Leads"
+        subtitle={`Equally divide ${selectedIds.length} selected leads across chosen callers with round-robin allocation`}
+        maxWidth="lg"
+      >
+        <div className="space-y-4 text-xs">
+          {/* Summary Box */}
+          <div className="p-3 bg-[#FAF8F5] border border-[#E5D8B8] rounded-xl flex items-center justify-between">
+            <span className="font-semibold text-stone-700">Leads to Distribute:</span>
+            <span className="font-bold text-sm text-[#08415C] font-mono">{selectedIds.length} Devotees</span>
+          </div>
+
+          {/* Batch / Campaign Tag Input */}
+          <div>
+            <label className="block text-[11px] font-bold text-[#08415C] uppercase mb-1">
+              Batch / Campaign Tag (Optional)
+            </label>
+            <input
+              type="text"
+              value={distributeBatchTag}
+              onChange={(e) => setDistributeBatchTag(e.target.value)}
+              placeholder="e.g. Youth Seminar Oct 2026 or Book Dist Batch 1"
+              className="w-full px-3 py-2 bg-white border border-[#E5D8B8] rounded-xl text-xs outline-none focus:border-[#08415C]"
+            />
+            <span className="text-[10px] text-stone-500 mt-0.5 block">
+              Tags these leads so callers can isolate this specific batch on the Calling Desk.
+            </span>
+          </div>
+
+          {/* Volunteer Selection */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[11px] font-bold text-[#08415C] uppercase">
+                Select Callers to Distribute Between:
+              </label>
+              <span className="text-[10px] text-stone-500">
+                {selectedVolunteersForSplit.length} callers selected
+              </span>
+            </div>
+
+            <div className="space-y-1.5 max-h-48 overflow-y-auto p-2 bg-[#FAF8F5] border border-[#E5D8B8] rounded-xl">
+              {volunteers.map((v) => {
+                const isChecked = selectedVolunteersForSplit.includes(v.id);
+                return (
+                  <label
+                    key={v.id}
+                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition ${
+                      isChecked ? "bg-white border border-[#08415C] shadow-xs" : "hover:bg-white/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          setSelectedVolunteersForSplit((prev) =>
+                            prev.includes(v.id) ? prev.filter((id) => id !== v.id) : [...prev, v.id]
+                          );
+                        }}
+                        className="rounded border-[#E5D8B8] text-[#08415C]"
+                      />
+                      <span className="font-semibold text-stone-800">{v.name}</span>
+                    </div>
+                    <span className="text-[10px] text-stone-500">
+                      Currently {v._count?.assignedPeople || 0} allotted
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Live Split Preview Box */}
+          {selectedVolunteersForSplit.length > 0 && (
+            <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl space-y-1.5">
+              <span className="text-[11px] font-bold text-emerald-900 block">
+                Distribution Preview (Equal Split):
+              </span>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-emerald-800">
+                {selectedVolunteersForSplit.map((vId, idx) => {
+                  const vol = volunteers.find((v) => v.id === vId);
+                  const count =
+                    Math.floor(selectedIds.length / selectedVolunteersForSplit.length) +
+                    (idx < selectedIds.length % selectedVolunteersForSplit.length ? 1 : 0);
+                  return (
+                    <div
+                      key={vId}
+                      className="flex items-center justify-between bg-white/80 px-2 py-1 rounded border border-emerald-200"
+                    >
+                      <span className="truncate font-semibold">{vol?.name || "Caller"}</span>
+                      <span className="font-bold font-mono">+{count} leads</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+            <button
+              type="button"
+              onClick={() => setIsDistributeModalOpen(false)}
+              className="px-3.5 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-100 rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={selectedVolunteersForSplit.length === 0 || bulkActionProcessing}
+              onClick={handleAutoDistributeLeads}
+              className="px-4 py-2 bg-[#00A896] hover:bg-[#028090] text-white text-xs font-bold rounded-xl shadow-xs disabled:opacity-50 flex items-center gap-1.5 transition"
+            >
+              <span>
+                {bulkActionProcessing
+                  ? "Distributing..."
+                  : `Confirm & Distribute ${selectedIds.length} Leads`}
+              </span>
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

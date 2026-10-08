@@ -10,7 +10,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { ids, action, value } = await request.json();
+    const body = await request.json();
+    const { ids, action, value } = body;
 
     if (!Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: "No members selected" }, { status: 400 });
@@ -24,6 +25,56 @@ export async function POST(request: Request) {
       await prisma.person.updateMany({
         where: { id: { in: ids } },
         data: { assignedVolunteerId: value || null },
+      });
+
+      return NextResponse.json({ success: true, count: ids.length });
+    }
+
+    if (action === "DISTRIBUTE_VOLUNTEERS") {
+      if (!hasPermission(currentUser, "calling:assign")) {
+        return NextResponse.json({ error: "Permission denied to assign calling persons." }, { status: 403 });
+      }
+
+      const volunteerIds = Array.isArray(value) ? value : body.volunteerIds;
+      const batchTag = body.batchTag;
+
+      if (!Array.isArray(volunteerIds) || volunteerIds.length === 0) {
+        return NextResponse.json({ error: "No volunteers selected for distribution" }, { status: 400 });
+      }
+
+      // Round-robin equal distribution across selected volunteers
+      const updates = [];
+      for (let i = 0; i < ids.length; i++) {
+        const assignedVolId = volunteerIds[i % volunteerIds.length];
+        const updateData: any = { assignedVolunteerId: assignedVolId };
+        if (batchTag) {
+          updateData.tags = batchTag;
+        }
+        updates.push(
+          prisma.person.update({
+            where: { id: ids[i] },
+            data: updateData,
+          })
+        );
+      }
+
+      await prisma.$transaction(updates);
+
+      return NextResponse.json({
+        success: true,
+        count: ids.length,
+        volunteersCount: volunteerIds.length,
+      });
+    }
+
+    if (action === "TAG_BATCH") {
+      if (!hasPermission(currentUser, "devotees:edit")) {
+        return NextResponse.json({ error: "Permission denied to edit tags." }, { status: 403 });
+      }
+
+      await prisma.person.updateMany({
+        where: { id: { in: ids } },
+        data: { tags: value },
       });
 
       return NextResponse.json({ success: true, count: ids.length });

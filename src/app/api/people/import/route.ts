@@ -3,13 +3,15 @@ import prisma from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
-    const { records } = await request.json();
+    const { records, batchTag, customSource, assignVolunteerIds } = await request.json();
     if (!Array.isArray(records)) {
       return NextResponse.json({ error: "Invalid records payload" }, { status: 400 });
     }
 
     let imported = 0;
     let duplicates = 0;
+
+    const hasVolunteers = Array.isArray(assignVolunteerIds) && assignVolunteerIds.length > 0;
 
     for (const item of records) {
       // Find mobile from various column names
@@ -21,8 +23,9 @@ export async function POST(request: Request) {
 
       const fullName = item["Name"] || item["Full Name"] || item["fullName"] || "Devotee";
       const area = item["Area"] || item["Locality"] || item["area"] || "Chandkheda";
-      const source = item["Source"] || item["source"] || "Excel Import";
+      const source = customSource || item["Source"] || item["source"] || "Excel Import";
       const profession = item["Profession"] || item["Occupation"] || "";
+      const tags = batchTag || item["Tags"] || item["tags"] || null;
 
       // Check duplicate
       const exists = await prisma.person.findUnique({
@@ -32,6 +35,10 @@ export async function POST(request: Request) {
       if (exists) {
         duplicates++;
       } else {
+        const assignedVolunteerId = hasVolunteers
+          ? assignVolunteerIds[imported % assignVolunteerIds.length]
+          : null;
+
         const p = await prisma.person.create({
           data: {
             fullName,
@@ -40,6 +47,8 @@ export async function POST(request: Request) {
             area,
             source,
             profession,
+            tags,
+            assignedVolunteerId,
             stage: "New Person",
           },
         });
@@ -49,7 +58,7 @@ export async function POST(request: Request) {
             personId: p.id,
             eventType: "NOTE",
             title: "Imported via Excel / CSV",
-            description: `Imported with source '${source}'`,
+            description: `Imported with source '${source}'${tags ? ` • Batch: '${tags}'` : ""}${assignedVolunteerId ? " • Auto-assigned to caller" : ""}`,
           },
         });
 

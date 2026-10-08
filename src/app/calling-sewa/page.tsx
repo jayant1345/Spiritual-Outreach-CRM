@@ -32,6 +32,8 @@ export default function CallingSewaPage() {
   const [followups, setFollowups] = useState<any[]>([]);
   const [volunteers, setVolunteers] = useState<any[]>([]);
   const [selectedVolunteer, setSelectedVolunteer] = useState("ALL");
+  const [selectedCampaign, setSelectedCampaign] = useState("ALL");
+  const [availableCampaigns, setAvailableCampaigns] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Reassignment modal or state
@@ -44,7 +46,9 @@ export default function CallingSewaPage() {
       const params = new URLSearchParams(window.location.search);
       const volId = params.get("volunteerId");
       const tab = params.get("tab");
+      const camp = params.get("campaign") || params.get("batch");
       if (volId) setSelectedVolunteer(volId);
+      if (camp) setSelectedCampaign(camp);
       if (tab && (tab === "calling" || tab === "calls_done" || tab === "relationship" || tab === "followups")) {
         setActiveTab(tab as any);
       }
@@ -53,7 +57,7 @@ export default function CallingSewaPage() {
 
   useEffect(() => {
     fetchData();
-  }, [refreshTrigger, selectedVolunteer, activeTab]);
+  }, [refreshTrigger, selectedVolunteer, selectedCampaign, activeTab]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -63,19 +67,44 @@ export default function CallingSewaPage() {
       const vData = await vRes.json();
       if (Array.isArray(vData)) setVolunteers(vData);
 
-      // 2. Fetch people
-      const pUrl = selectedVolunteer !== "ALL" ? `/api/people?volunteerId=${selectedVolunteer}` : "/api/people";
-      const pRes = await fetch(pUrl);
+      // 2. Fetch people with volunteer and campaign/batch filter
+      const pParams = new URLSearchParams();
+      if (selectedVolunteer !== "ALL") pParams.append("volunteerId", selectedVolunteer);
+      if (selectedCampaign !== "ALL") {
+        pParams.append("source", selectedCampaign);
+        pParams.append("tag", selectedCampaign);
+      }
+
+      const pRes = await fetch(`/api/people?${pParams.toString()}`);
       const pData = await pRes.json();
       if (Array.isArray(pData)) setPeople(pData);
 
-      // 3. Fetch followups
+      // 3. Extract unique batches & campaigns across CRM members
+      const allRes = await fetch("/api/people");
+      const allData = await allRes.json();
+      if (Array.isArray(allData)) {
+        const campSet = new Set<string>();
+        allData.forEach((p: any) => {
+          if (p.source && p.source !== "Excel Import" && p.source !== "Reference") {
+            campSet.add(p.source);
+          }
+          if (p.tags) {
+            p.tags.split(",").forEach((t: string) => {
+              const c = t.trim();
+              if (c) campSet.add(c);
+            });
+          }
+        });
+        setAvailableCampaigns(Array.from(campSet));
+      }
+
+      // 4. Fetch followups
       const fUrl = selectedVolunteer !== "ALL" ? `/api/followups?volunteerId=${selectedVolunteer}` : "/api/followups";
       const fRes = await fetch(fUrl);
       const fData = await fRes.json();
       if (Array.isArray(fData)) setFollowups(fData);
 
-      // 4. Fetch calls done (call logs)
+      // 5. Fetch calls done (call logs)
       const cUrl = selectedVolunteer !== "ALL" ? `/api/calls?volunteerId=${selectedVolunteer}` : "/api/calls";
       const cRes = await fetch(cUrl);
       const cData = await cRes.json();
@@ -151,27 +180,47 @@ export default function CallingSewaPage() {
           </p>
         </div>
 
-        {/* Volunteer Filter */}
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="px-3 py-1.5 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs w-full sm:w-auto">
-            <span className="text-stone-500">Filter by Caller:</span>
+        {/* Dual Filters: Caller + Batch/Campaign */}
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+          {/* Volunteer Filter */}
+          <div className="px-3 py-1.5 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs flex-1 sm:flex-initial">
+            <span className="text-stone-500">Caller:</span>
             <select
               value={selectedVolunteer}
               onChange={(e) => setSelectedVolunteer(e.target.value)}
-              className="bg-transparent text-[#08415C] font-bold outline-none cursor-pointer flex-1"
+              className="bg-transparent text-[#08415C] font-bold outline-none cursor-pointer"
             >
-              <option value="ALL">All Volunteer Queues</option>
+              <option value="ALL">All Callers</option>
               {volunteers.map((v) => (
                 <option key={v.id} value={v.id}>{v.name} ({v.role.replace(/_/g, " ")})</option>
               ))}
             </select>
           </div>
-          {selectedVolunteer !== "ALL" && (
+
+          {/* Batch / Campaign Filter */}
+          <div className="px-3 py-1.5 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs flex-1 sm:flex-initial">
+            <span className="text-stone-500">Batch / Category:</span>
+            <select
+              value={selectedCampaign}
+              onChange={(e) => setSelectedCampaign(e.target.value)}
+              className="bg-transparent text-[#08415C] font-bold outline-none cursor-pointer"
+            >
+              <option value="ALL">All Batches & Sources</option>
+              {availableCampaigns.map((camp) => (
+                <option key={camp} value={camp}>{camp}</option>
+              ))}
+            </select>
+          </div>
+
+          {(selectedVolunteer !== "ALL" || selectedCampaign !== "ALL") && (
             <button
               type="button"
-              onClick={() => setSelectedVolunteer("ALL")}
+              onClick={() => {
+                setSelectedVolunteer("ALL");
+                setSelectedCampaign("ALL");
+              }}
               className="px-2.5 py-1.5 text-xs text-stone-600 hover:text-stone-900 bg-stone-100 rounded-xl"
-              title="Reset caller filter"
+              title="Reset all filters"
             >
               Reset
             </button>
@@ -388,6 +437,16 @@ export default function CallingSewaPage() {
                       <Badge variant="morpankh" size="sm">{person.stage}</Badge>
                       <span className="text-xs font-mono text-stone-600 font-semibold">+91 {person.mobile}</span>
                       {person.area && <span className="text-[11px] text-stone-500">• {person.area}</span>}
+                      {person.tags && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                          🏷️ {person.tags}
+                        </span>
+                      )}
+                      {person.source && person.source !== "Reference" && person.source !== "Excel Import" && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 border border-stone-200">
+                          {person.source}
+                        </span>
+                      )}
                     </div>
 
                     <div className="text-[11px] text-stone-500 mt-1 flex items-center gap-3 flex-wrap">
