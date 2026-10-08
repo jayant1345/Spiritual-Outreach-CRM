@@ -150,7 +150,7 @@ export const Header: React.FC<HeaderProps> = ({
   const badge = getRoleBadge(user?.role);
 
   return (
-    <header className="sticky top-0 z-20 h-16 bg-[#FAF8F5]/90 backdrop-blur-xl border-b border-[#E5D8B8] px-3 sm:px-6 flex items-center justify-between gap-2.5 sm:gap-4 shadow-xs">
+    <header className="sticky top-0 z-20 h-16 bg-[#FAF8F5]/90 backdrop-blur-xl border-b border-[#E5D8B8] px-2.5 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 shadow-xs w-full max-w-full">
       {/* Mobile Hamburger Drawer Trigger */}
       {onOpenMobileMenu && (
         <button
@@ -166,7 +166,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Active Global Search Bar */}
       <div ref={searchRef} className="flex-1 max-w-xl relative min-w-0">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#78909C]" />
+        <Search className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#78909C]" />
         <input
           type="text"
           value={query}
@@ -180,8 +180,8 @@ export const Header: React.FC<HeaderProps> = ({
               router.push(`/people?query=${encodeURIComponent(query.trim())}`);
             }
           }}
-          placeholder="Search Members, Phone, Locality... (Press Enter)"
-          className="w-full pl-9 sm:pl-10 pr-8 py-2 bg-white border border-[#E5D8B8] rounded-xl text-xs sm:text-sm text-[#0B192C] placeholder-[#78909C] focus:outline-none focus:ring-2 focus:ring-[#08415C]/20 focus:border-[#08415C] shadow-xs transition"
+          placeholder="Search Members, Phone, Locality..."
+          className="w-full pl-8 sm:pl-10 pr-7 sm:pr-8 py-2 bg-white border border-[#E5D8B8] rounded-xl text-xs sm:text-sm text-[#0B192C] placeholder-[#78909C] focus:outline-none focus:ring-2 focus:ring-[#08415C]/20 focus:border-[#08415C] shadow-xs transition"
         />
         {query && (
           <button
@@ -249,7 +249,7 @@ export const Header: React.FC<HeaderProps> = ({
         )}
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
         {/* Center Badge */}
         <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold text-[#08415C] shadow-xs">
           <MapPin className="w-3.5 h-3.5 text-[#D4AF37]" />
@@ -257,7 +257,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Notification Bell 🔔 */}
-        <div ref={notifRef} className="relative">
+        <div ref={notifRef} className="relative flex-shrink-0">
           <button
             type="button"
             onClick={() => setIsNotifOpen(!isNotifOpen)}
@@ -275,7 +275,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Notification Dropdown */}
           {isNotifOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-stone-200 py-2.5 z-50 animate-fadeIn">
+            <div className="absolute right-0 mt-2 w-[calc(100vw-24px)] sm:w-96 max-w-sm bg-white rounded-2xl shadow-2xl border border-stone-200 py-2.5 z-50 animate-fadeIn">
               <div className="px-4 py-2 border-b border-stone-100 flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
@@ -412,19 +412,20 @@ export const Header: React.FC<HeaderProps> = ({
         {onOpenAddPerson && (
           <button
             onClick={onOpenAddPerson}
-            className="px-3 sm:px-3.5 py-2 bg-[#08415C] hover:bg-[#063349] text-white text-xs font-semibold rounded-xl border border-[#D4AF37]/50 shadow-gold flex items-center gap-1.5 transition flex-shrink-0"
+            className="p-2 sm:px-3.5 sm:py-2 bg-[#08415C] hover:bg-[#063349] text-white text-xs font-semibold rounded-xl border border-[#D4AF37]/50 shadow-gold flex items-center gap-1.5 transition flex-shrink-0"
+            title="Add New Member"
           >
-            <Plus className="w-3.5 h-3.5 text-[#D4AF37]" />
-            <span>+ Add New Members</span>
+            <Plus className="w-4 h-4 text-[#D4AF37]" />
+            <span className="hidden sm:inline">+ Add Member</span>
           </button>
         )}
 
         {/* Profile Dropdown */}
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           <button
             type="button"
             onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 bg-white border border-[#E5D8B8] rounded-xl hover:border-[#08415C] transition shadow-xs"
+            className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:px-2.5 sm:py-1.5 bg-white border border-[#E5D8B8] rounded-xl hover:border-[#08415C] transition shadow-xs"
           >
             <div className="w-7 h-7 rounded-lg bg-[#08415C] text-white flex items-center justify-center border border-[#D4AF37]">
               <User className="w-3.5 h-3.5 text-[#D4AF37]" />

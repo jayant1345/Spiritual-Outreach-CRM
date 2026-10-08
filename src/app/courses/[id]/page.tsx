@@ -163,29 +163,29 @@ export default function CourseAttendanceMatrixPage() {
   return (
     <div className="space-y-6">
       {/* Back Navigation & Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-[#78909C]">
-        <Link href="/courses" className="hover:text-[#08415C] flex items-center gap-1 font-semibold">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-[#78909C]">
+        <Link href="/courses" className="hover:text-[#08415C] flex items-center gap-1 font-semibold flex-shrink-0">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Courses
         </Link>
         <span>/</span>
-        <span>{course.title}</span>
+        <span className="truncate max-w-[140px] sm:max-w-none">{course.title}</span>
         <span>/</span>
-        <span className="text-[#08415C] font-semibold">{batch.batchName}</span>
+        <span className="text-[#08415C] font-semibold truncate max-w-[120px] sm:max-w-none">{batch.batchName}</span>
       </div>
 
       {/* Top Course Header Banner */}
-      <div className="gold-card p-5 space-y-4">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
+      <div className="gold-card p-4 sm:p-5 space-y-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
+          <div className="min-w-0 w-full">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-serif font-bold text-2xl text-[#08415C]">
+              <h2 className="font-serif font-bold text-xl sm:text-2xl text-[#08415C] break-words">
                 {course.title}
               </h2>
               <Badge variant="emerald">
                 {sessions.filter((s: any) => s.completed).length} of {course.totalSessions} Sessions Done
               </Badge>
             </div>
-            <p className="text-xs text-[#78909C] mt-1">
+            <p className="text-xs text-[#78909C] mt-1 break-words">
               Faculty: <strong>{course.facultyName || "HG Radheshyam Das"}</strong> • Schedule: {batch.scheduleInfo} • Venue: {course.venue}
             </p>
           </div>
@@ -194,7 +194,7 @@ export default function CourseAttendanceMatrixPage() {
           <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
             <button
               onClick={handleExportExcel}
-              className="px-3.5 py-2 bg-white border border-[#E5D8B8] hover:border-[#D4AF37] text-xs font-semibold text-[#08415C] rounded-xl shadow-sm flex items-center gap-1.5 transition"
+              className="px-3.5 py-2 bg-white border border-[#E5D8B8] hover:border-[#D4AF37] text-xs font-semibold text-[#08415C] rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
             >
               <FileSpreadsheet className="w-4 h-4 text-[#00A896]" />
               <span>Export Matrix (.xlsx)</span>
@@ -202,30 +202,30 @@ export default function CourseAttendanceMatrixPage() {
           </div>
         </div>
 
-        {/* Regularity KPI Breakdown */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2 border-t border-[#E5D8B8]/60">
-          <div className="p-3 bg-[#FAF8F5] border border-[#E5D8B8] rounded-xl text-center">
-            <div className="text-xs text-[#78909C]">Total Registered</div>
-            <div className="text-xl font-bold font-serif text-[#08415C] mt-0.5">{enrollments.length} Students</div>
+        {/* Regularity KPI Breakdown - 2x2 grid on mobile, 4 columns on large screens */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 pt-3 border-t border-[#E5D8B8]/60">
+          <div className="p-2.5 sm:p-3 bg-[#FAF8F5] border border-[#E5D8B8] rounded-xl text-center">
+            <div className="text-[11px] sm:text-xs text-[#78909C]">Total Registered</div>
+            <div className="text-lg sm:text-xl font-bold font-serif text-[#08415C] mt-0.5">{enrollments.length} Students</div>
           </div>
-          <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-center">
-            <div className="text-xs text-emerald-800">Regular (≥75% Attendance)</div>
-            <div className="text-xl font-bold text-emerald-700 mt-0.5">{regularCount} Students</div>
+          <div className="p-2.5 sm:p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-center">
+            <div className="text-[11px] sm:text-xs text-emerald-800">Regular (≥75%)</div>
+            <div className="text-lg sm:text-xl font-bold text-emerald-700 mt-0.5">{regularCount} Students</div>
           </div>
-          <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-center">
-            <div className="text-xs text-amber-800">Irregular (50-74%)</div>
-            <div className="text-xl font-bold text-amber-700 mt-0.5">{irregularCount} (Needs Calling)</div>
+          <div className="p-2.5 sm:p-3 bg-amber-50 border border-amber-300 rounded-xl text-center">
+            <div className="text-[11px] sm:text-xs text-amber-800">Irregular (50-74%)</div>
+            <div className="text-lg sm:text-xl font-bold text-amber-700 mt-0.5">{irregularCount} Need Calling</div>
           </div>
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-center">
-            <div className="text-xs text-red-800">Low Attendance (&lt;50%)</div>
-            <div className="text-xl font-bold text-red-700 mt-0.5">{lowCount} (Urgent Care)</div>
+          <div className="p-2.5 sm:p-3 bg-red-50 border border-red-200 rounded-xl text-center">
+            <div className="text-[11px] sm:text-xs text-red-800">Low Attendance (&lt;50%)</div>
+            <div className="text-lg sm:text-xl font-bold text-red-700 mt-0.5">{lowCount} Urgent Care</div>
           </div>
         </div>
       </div>
 
       {/* Interactive Controls & Filters */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <input
             type="text"
             value={searchQuery}
@@ -237,7 +237,7 @@ export default function CourseAttendanceMatrixPage() {
           <select
             value={selectedRegularity}
             onChange={(e) => setSelectedRegularity(e.target.value)}
-            className="px-3.5 py-2 bg-white border border-[#E5D8B8] rounded-xl text-xs text-[#0B192C] focus:outline-none focus:border-[#08415C]"
+            className="px-3.5 py-2 bg-white border border-[#E5D8B8] rounded-xl text-xs text-[#0B192C] focus:outline-none focus:border-[#08415C] w-full sm:w-auto"
           >
             <option value="ALL">All Standing</option>
             <option value="REGULAR">Regular Students</option>
@@ -247,14 +247,19 @@ export default function CourseAttendanceMatrixPage() {
         </div>
 
         <span className="text-xs text-[#78909C]">
-          Showing <strong>{filteredEnrollments.length}</strong> of {enrollments.length} Students • Click any session cell to toggle status
+          Showing <strong>{filteredEnrollments.length}</strong> of {enrollments.length} Students • <span className="hidden sm:inline">Click any session cell to toggle status</span><span className="sm:hidden">Tap cell to toggle</span>
         </span>
       </div>
 
       {/* Interactive Session Attendance Matrix Table */}
       <div className="gold-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+        {/* Mobile Swipe Hint */}
+        <div className="sm:hidden px-3.5 py-2 bg-[#FAF8F5] border-b border-[#E5D8B8]/80 text-[11px] text-[#78909C] flex items-center justify-between font-medium">
+          <span>👈 Swipe horizontally to view sessions & actions 👉</span>
+          <span>{sessions.length} Sessions</span>
+        </div>
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-xs border-collapse min-w-[760px]">
             <thead className="bg-[#FAF8F5] border-b border-[#E5D8B8] text-[#78909C] uppercase font-semibold">
               <tr>
                 <th className="p-3.5 w-8 text-center">#</th>
