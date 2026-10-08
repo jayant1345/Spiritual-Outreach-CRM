@@ -28,7 +28,7 @@ import {
   Check,
 } from "lucide-react";
 
-export default function CourseAttendanceMatrixPage() {
+function CourseAttendanceMatrixInner() {
   const params = useParams();
   const searchParams = useSearchParams();
   const courseId = params?.id as string;
@@ -47,20 +47,6 @@ export default function CourseAttendanceMatrixPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [markingSessionId, setMarkingSessionId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (courseId) {
-      fetchCourseDetails();
-    }
-  }, [courseId]);
-
-  useEffect(() => {
-    if (urlBatchId) {
-      setSelectedBatchId(urlBatchId);
-    } else if (course?.batches?.length > 0 && !selectedBatchId) {
-      setSelectedBatchId(course.batches[0].id);
-    }
-  }, [urlBatchId, course]);
-
   const fetchCourseDetails = async () => {
     setLoading(true);
     try {
@@ -73,6 +59,33 @@ export default function CourseAttendanceMatrixPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (courseId) {
+      fetchCourseDetails();
+    }
+  }, [courseId]);
+
+  useEffect(() => {
+    if (urlBatchId) {
+      setSelectedBatchId(urlBatchId);
+    } else if (course?.batches?.length > 0 && !selectedBatchId) {
+      setSelectedBatchId(course.batches[0].id);
+    }
+  }, [urlBatchId, course, selectedBatchId]);
+
+  const batch =
+    (course?.batches && course.batches.find((b: any) => b.id === selectedBatchId)) ||
+    course?.batches?.[0] || { sessions: [], enrollments: [], batchName: "Main Batch" };
+  const sessions = batch?.sessions || [];
+  const enrollments = batch?.enrollments || [];
+
+  useEffect(() => {
+    if (sessions.length > 0 && !selectedSessionId) {
+      const uncompleted = sessions.find((s: any) => !s.completed);
+      setSelectedSessionId(uncompleted ? uncompleted.id : sessions[0].id);
+    }
+  }, [sessions, selectedSessionId]);
 
   const handleToggleAttendance = async (
     sessionId: string,
@@ -125,26 +138,25 @@ export default function CourseAttendanceMatrixPage() {
   };
 
   const handleExportExcel = () => {
-    if (!course || !course.batches?.[0]) return;
-    const batch = course.batches[0];
-    const sessions = batch.sessions || [];
+    if (!course || !batch) return;
+    const sList = sessions || [];
 
-    const rows = batch.enrollments.map((enr: any, idx: number) => {
+    const rows = (enrollments || []).map((enr: any, idx: number) => {
       const rowData: any = {
         "Sr No": idx + 1,
-        "Student Name": enr.person.fullName,
-        "Mobile Number": enr.person.mobile,
-        "Locality": enr.person.area || "Chandkheda",
-        "Assigned Volunteer": enr.person.assignedVolunteer?.name || "Unassigned",
+        "Student Name": enr.person?.fullName || "Unnamed",
+        "Mobile Number": enr.person?.mobile || "",
+        "Locality": enr.person?.area || "Chandkheda",
+        "Assigned Volunteer": enr.person?.assignedVolunteer?.name || "Unassigned",
       };
 
-      sessions.forEach((sess: any) => {
-        const att = enr.attendances.find((a: any) => a.sessionId === sess.id);
+      sList.forEach((sess: any) => {
+        const att = enr.attendances?.find((a: any) => a.sessionId === sess.id);
         rowData[`Session ${sess.sessionNumber}`] = att ? att.status : "—";
       });
 
-      rowData["Attendance %"] = `${enr.attendancePercent}%`;
-      rowData["Regularity Status"] = enr.status;
+      rowData["Attendance %"] = `${enr.attendancePercent || 0}%`;
+      rowData["Regularity Status"] = enr.status || "UNKNOWN";
 
       return rowData;
     });
@@ -152,7 +164,7 @@ export default function CourseAttendanceMatrixPage() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance Grid");
-    XLSX.writeFile(wb, `${course.title}_Attendance_Matrix.xlsx`);
+    XLSX.writeFile(wb, `${course?.title || "Course"}_Attendance_Matrix.xlsx`);
   };
 
   if (loading || !course) {
@@ -164,16 +176,12 @@ export default function CourseAttendanceMatrixPage() {
     );
   }
 
-  const batch =
-    (course.batches && course.batches.find((b: any) => b.id === selectedBatchId)) ||
-    course.batches?.[0] || { sessions: [], enrollments: [] };
-  const sessions = batch.sessions || [];
-  const enrollments = batch.enrollments || [];
-
   const filteredEnrollments = enrollments.filter((enr: any) => {
+    const fullName = enr.person?.fullName || "";
+    const mobile = enr.person?.mobile || "";
     const matchesSearch =
-      enr.person.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      enr.person.mobile.includes(searchQuery);
+      fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      mobile.includes(searchQuery);
     const matchesReg =
       selectedRegularity === "ALL" || enr.status === selectedRegularity;
     return matchesSearch && matchesReg;
@@ -188,13 +196,6 @@ export default function CourseAttendanceMatrixPage() {
     sessions.find((s: any) => s.id === selectedSessionId) ||
     sessions.find((s: any) => !s.completed) ||
     sessions[0];
-
-  useEffect(() => {
-    if (sessions?.length > 0 && !selectedSessionId) {
-      const uncompleted = sessions.find((s: any) => !s.completed);
-      setSelectedSessionId(uncompleted ? uncompleted.id : sessions[0].id);
-    }
-  }, [sessions, selectedSessionId]);
 
   // Compute RSVP and Attendance metrics for the active session
   let confirmedRsvpCount = 0;
@@ -216,11 +217,14 @@ export default function CourseAttendanceMatrixPage() {
 
   const checkinEnrollments = enrollments.filter((enr: any) => {
     const q = searchQuery.toLowerCase().trim();
+    const fullName = enr.person?.fullName || "";
+    const mobile = enr.person?.mobile || "";
+    const area = enr.person?.area || "";
     const matchesSearch =
       !q ||
-      enr.person.fullName.toLowerCase().includes(q) ||
-      enr.person.mobile.includes(q) ||
-      (enr.person.area && enr.person.area.toLowerCase().includes(q));
+      fullName.toLowerCase().includes(q) ||
+      mobile.includes(q) ||
+      area.toLowerCase().includes(q);
 
     const hasConfirmedCall = enr.person?.callLogs?.some(
       (c: any) => c.outcome === "YES_WILL_ATTEND"
@@ -823,5 +827,20 @@ export default function CourseAttendanceMatrixPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CourseAttendanceMatrixPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="py-24 text-center text-[#78909C]">
+          <div className="inline-block animate-spin text-3xl text-[#D4AF37] mb-3">🪷</div>
+          <p className="text-sm font-semibold">Loading Course Attendance Matrix...</p>
+        </div>
+      }
+    >
+      <CourseAttendanceMatrixInner />
+    </React.Suspense>
   );
 }
