@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useContext } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CRMContext } from "@/components/layout/RootShell";
 import Badge from "@/components/common/Badge";
@@ -21,14 +21,19 @@ import {
   AlertTriangle,
   RefreshCw,
   CalendarPlus,
+  Layers,
 } from "lucide-react";
 
 export default function CourseAttendanceMatrixPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const courseId = params?.id as string;
+  const urlBatchId = searchParams?.get("batchId") || "";
+
   const { openPersonModal, openCallModal, openWhatsAppModal } = useContext(CRMContext);
 
   const [course, setCourse] = useState<any>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<string>(urlBatchId);
   const [loading, setLoading] = useState(true);
   const [selectedRegularity, setSelectedRegularity] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,6 +44,14 @@ export default function CourseAttendanceMatrixPage() {
       fetchCourseDetails();
     }
   }, [courseId]);
+
+  useEffect(() => {
+    if (urlBatchId) {
+      setSelectedBatchId(urlBatchId);
+    } else if (course?.batches?.length > 0 && !selectedBatchId) {
+      setSelectedBatchId(course.batches[0].id);
+    }
+  }, [urlBatchId, course]);
 
   const fetchCourseDetails = async () => {
     setLoading(true);
@@ -143,7 +156,9 @@ export default function CourseAttendanceMatrixPage() {
     );
   }
 
-  const batch = course.batches?.[0] || { sessions: [], enrollments: [] };
+  const batch =
+    (course.batches && course.batches.find((b: any) => b.id === selectedBatchId)) ||
+    course.batches?.[0] || { sessions: [], enrollments: [] };
   const sessions = batch.sessions || [];
   const enrollments = batch.enrollments || [];
 
@@ -173,6 +188,35 @@ export default function CourseAttendanceMatrixPage() {
         <span className="text-[#08415C] font-semibold truncate max-w-[120px] sm:max-w-none">{batch.batchName}</span>
       </div>
 
+      {/* Batch Tabs if multiple batches exist for this course */}
+      {course.batches && course.batches.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <span className="text-xs font-bold text-stone-500 whitespace-nowrap flex items-center gap-1">
+            <Layers className="w-3.5 h-3.5 text-[#D4AF37]" /> Batches:
+          </span>
+          {course.batches.map((b: any) => (
+            <button
+              key={b.id}
+              onClick={() => setSelectedBatchId(b.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                b.id === batch.id
+                  ? "bg-[#08415C] text-white shadow-xs"
+                  : "bg-white border border-stone-200 text-stone-700 hover:bg-stone-50"
+              }`}
+            >
+              <span>{b.batchName}</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  b.id === batch.id ? "bg-white/20 text-white" : "bg-stone-100 text-stone-600"
+                }`}
+              >
+                {b.enrollments?.length || 0}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Top Course Header Banner */}
       <div className="gold-card p-4 sm:p-5 space-y-4">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
@@ -186,12 +230,21 @@ export default function CourseAttendanceMatrixPage() {
               </Badge>
             </div>
             <p className="text-xs text-[#78909C] mt-1 break-words">
-              Faculty: <strong>{course.facultyName || "HG Radheshyam Das"}</strong> • Schedule: {batch.scheduleInfo} • Venue: {course.venue}
+              Faculty: <strong>{course.facultyName || "HG Radheshyam Das"}</strong> • Batch: <strong>{batch.batchName}</strong> • Schedule: {batch.scheduleInfo} • Venue: {course.venue}
             </p>
           </div>
 
           {/* Quick Action Buttons */}
           <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+            <Link
+              href={`/calling-sewa?batch=${encodeURIComponent(batch.batchName)}`}
+              className="px-3.5 py-2 bg-amber-50 border border-amber-300 hover:bg-amber-100 text-xs font-bold text-amber-900 rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
+              title={`Open Calling Desk for ${batch.batchName}`}
+            >
+              <PhoneCall className="w-4 h-4 text-amber-700" />
+              <span>📞 Calling Desk</span>
+            </Link>
+
             <button
               onClick={handleExportExcel}
               className="px-3.5 py-2 bg-white border border-[#E5D8B8] hover:border-[#D4AF37] text-xs font-semibold text-[#08415C] rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition w-full sm:w-auto"

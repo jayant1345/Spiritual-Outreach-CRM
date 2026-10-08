@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Badge from "@/components/common/Badge";
 import Modal from "@/components/common/Modal";
+import BatchBulkImportModal from "@/components/courses/BatchBulkImportModal";
+import EditBatchModal from "@/components/courses/EditBatchModal";
 import {
   GraduationCap,
   Plus,
@@ -17,6 +19,10 @@ import {
   Clock,
   Layers,
   UserPlus,
+  FileSpreadsheet,
+  PhoneCall,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -30,6 +36,10 @@ export default function CoursesPage() {
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
   const [isAddBatchOpen, setIsAddBatchOpen] = useState(false);
   const [isEnrollOpen, setIsEnrollOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [bulkBatch, setBulkBatch] = useState<any>(null);
+  const [isEditBatchOpen, setIsEditBatchOpen] = useState(false);
+  const [batchToEdit, setBatchToEdit] = useState<any>(null);
 
   const [selectedCourseForBatch, setSelectedCourseForBatch] = useState<string>("");
   const [selectedBatchForEnroll, setSelectedBatchForEnroll] = useState<string>("");
@@ -168,6 +178,29 @@ export default function CoursesPage() {
     }
   };
 
+  const handleDeleteBatch = async (batchId: string, batchName: string) => {
+    if (
+      !confirm(
+        `Are you sure you want to delete batch "${batchName}"?\nAll sessions and enrollments in this batch will be permanently removed.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/courses/batches?id=${batchId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        fetchCourses();
+      } else {
+        const d = await res.json();
+        alert(d.error || "Failed to delete batch");
+      }
+    } catch (err) {
+      console.error("Delete batch error:", err);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
@@ -246,46 +279,109 @@ export default function CoursesPage() {
                   )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {course.batches && course.batches.length > 0 ? (
                     course.batches.map((batch: any) => (
                       <div
                         key={batch.id}
-                        className="p-3 bg-[#FAF8F5] border border-[#E5D8B8] rounded-xl flex items-center justify-between gap-3 text-xs"
+                        className="p-3.5 bg-[#FAF8F5] border border-[#E5D8B8] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs shadow-xs"
                       >
-                        <div>
-                          <div className="font-bold text-[#08415C] flex items-center gap-2">
-                            <span>{batch.batchName}</span>
-                            <span className="text-[10px] font-normal text-stone-500 font-mono">
-                              ({batch.enrollments?.length || 0} Members)
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-[#08415C] flex items-center gap-2 flex-wrap">
+                            <span className="text-sm">{batch.batchName}</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                              {batch.enrollments?.length || 0} Devotees
                             </span>
+                            {batch.active === false && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-stone-200 text-stone-600">
+                                Inactive
+                              </span>
+                            )}
                           </div>
-                          <span className="text-[11px] text-stone-500">{batch.scheduleInfo}</span>
+                          <span className="text-[11px] text-stone-500 block mt-0.5 font-medium">{batch.scheduleInfo}</span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap justify-start md:justify-end">
                           {hasPermission("courses:manage") && (
                             <button
                               type="button"
                               onClick={() => {
-                                setSelectedBatchForEnroll(batch.id);
-                                setIsEnrollOpen(true);
+                                setBulkBatch({
+                                  id: batch.id,
+                                  batchName: batch.batchName,
+                                  courseTitle: course.title,
+                                });
+                                setIsBulkImportOpen(true);
                               }}
-                              className="px-2 py-1 bg-white hover:bg-stone-50 border border-stone-200 text-[#08415C] rounded-lg text-[11px] font-bold flex items-center gap-1"
-                              title="Add Members to Batch"
+                              className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
+                              title="Bulk Excel Import or Multi-select Members into this Batch"
                             >
-                              <UserPlus className="w-3 h-3 text-[#00A896]" />
-                              <span>+ Member</span>
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-amber-700" />
+                              <span>📥 Bulk / Excel</span>
                             </button>
                           )}
 
                           <Link
-                            href={`/courses/${course.id}`}
-                            className="px-2.5 py-1 bg-[#08415C] hover:bg-[#063349] text-white rounded-lg text-[11px] font-bold flex items-center gap-1"
+                            href={`/calling-sewa?batch=${encodeURIComponent(batch.batchName)}`}
+                            className="px-2.5 py-1.5 bg-white hover:bg-stone-50 border border-stone-200 text-[#08415C] rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
+                            title="Open Calling Desk filtered for this Batch"
+                          >
+                            <PhoneCall className="w-3 h-3 text-[#00A896]" />
+                            <span>Calling</span>
+                          </Link>
+
+                          <Link
+                            href={`/courses/${course.id}?batchId=${batch.id}`}
+                            className="px-2.5 py-1.5 bg-[#08415C] hover:bg-[#063349] text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-gold transition"
+                            title="Open Session Attendance Grid"
                           >
                             <span>Attendance</span>
                             <ArrowRight className="w-3 h-3" />
                           </Link>
+
+                          {hasPermission("courses:manage") && (
+                            <div className="flex items-center gap-1 border-l border-stone-200 pl-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedBatchForEnroll(batch.id);
+                                  setIsEnrollOpen(true);
+                                }}
+                                className="p-1.5 bg-white hover:bg-stone-100 border border-stone-200 text-[#00A896] rounded-lg"
+                                title="Add Single Member from Directory"
+                              >
+                                <UserPlus className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBatchToEdit({
+                                    id: batch.id,
+                                    batchName: batch.batchName,
+                                    scheduleInfo: batch.scheduleInfo,
+                                    startDate: batch.startDate,
+                                    active: batch.active,
+                                    courseTitle: course.title,
+                                  });
+                                  setIsEditBatchOpen(true);
+                                }}
+                                className="p-1.5 bg-white hover:bg-stone-100 border border-stone-200 text-stone-600 rounded-lg"
+                                title="Edit Batch Details"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteBatch(batch.id, batch.batchName)}
+                                className="p-1.5 bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 rounded-lg"
+                                title="Delete Batch"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))
@@ -526,6 +622,29 @@ export default function CoursesPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Modal: Bulk / Excel Import into Batch */}
+      <BatchBulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => {
+          setIsBulkImportOpen(false);
+          setBulkBatch(null);
+        }}
+        batch={bulkBatch}
+        members={members}
+        onSuccess={() => fetchCourses()}
+      />
+
+      {/* Modal: Edit Batch */}
+      <EditBatchModal
+        isOpen={isEditBatchOpen}
+        onClose={() => {
+          setIsEditBatchOpen(false);
+          setBatchToEdit(null);
+        }}
+        batch={batchToEdit}
+        onSuccess={() => fetchCourses()}
+      />
     </div>
   );
 }

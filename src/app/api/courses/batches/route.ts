@@ -57,3 +57,59 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser || !hasPermission(currentUser, "courses:manage")) {
+      return NextResponse.json({ error: "Unauthorized. Courses management permission required." }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { id, batchName, scheduleInfo, startDate, active } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "Batch ID is required" }, { status: 400 });
+    }
+
+    const updated = await prisma.courseBatch.update({
+      where: { id },
+      data: {
+        ...(batchName ? { batchName: batchName.trim() } : {}),
+        ...(scheduleInfo !== undefined ? { scheduleInfo: scheduleInfo.trim() } : {}),
+        ...(startDate ? { startDate: new Date(startDate) } : {}),
+        ...(active !== undefined ? { active: Boolean(active) } : {}),
+      },
+    });
+
+    return NextResponse.json({ success: true, batch: updated });
+  } catch (error: any) {
+    console.error("Batch update error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser || !hasPermission(currentUser, "courses:manage")) {
+      return NextResponse.json({ error: "Unauthorized. Courses management permission required." }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Batch ID is required" }, { status: 400 });
+    }
+
+    await prisma.courseBatch.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ success: true, message: "Batch deleted successfully" });
+  } catch (error: any) {
+    console.error("Batch deletion error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

@@ -84,18 +84,20 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
       }}
     >
       <div className="min-h-screen bg-[#FAF8F5] flex relative overflow-x-hidden">
-        {/* Divine Sri Sri Radha Govind Ahmedabad Devotional Glass Background */}
+        {/* Divine Sri Sri Radha Govind Ahmedabad Devotional Soft Aura Background */}
         <div 
           className="fixed inset-0 pointer-events-none z-0 transition-opacity duration-700"
           style={{
-            backgroundImage: "url('/images/radha-govind-app.jpg')",
+            backgroundImage: "url('/images/radha-govind-watermark.jpg'), url('/images/radha-govind-app.jpg')",
             backgroundSize: "cover",
-            backgroundPosition: "center 5%",
+            backgroundPosition: "center 10%",
             backgroundAttachment: "fixed",
-            opacity: 0.65,
-            filter: "contrast(118%) brightness(78%) saturate(120%)",
+            opacity: 0.10,
+            filter: "contrast(102%) brightness(105%)",
           }}
         />
+        {/* Soft golden ambient gradient overlay to ensure crisp readability */}
+        <div className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-[#FAF8F5]/60 via-transparent to-[#FAF8F5]/80" />
 
 
         <Sidebar

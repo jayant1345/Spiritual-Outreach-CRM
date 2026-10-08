@@ -44,8 +44,27 @@ export async function GET(request: Request) {
 
     if (area && area !== "ALL") where.area = { contains: area };
     if (stage && stage !== "ALL") where.stage = stage;
-    if (source && source !== "ALL") where.source = source;
-    if (tag && tag !== "ALL") where.tags = { contains: tag };
+    if (source && source !== "ALL" && !searchParams.get("batch")) where.source = source;
+
+    const batchFilter = searchParams.get("batch") || tag;
+    if (batchFilter && batchFilter !== "ALL") {
+      where.AND = where.AND || [];
+      where.AND.push({
+        OR: [
+          { tags: { contains: batchFilter } },
+          { source: { contains: batchFilter } },
+          {
+            courseEnrollments: {
+              some: {
+                batch: {
+                  batchName: { contains: batchFilter },
+                },
+              },
+            },
+          },
+        ],
+      });
+    }
 
     const people = await prisma.person.findMany({
       where,
@@ -59,6 +78,7 @@ export async function GET(request: Request) {
             status: true,
             attendancePercent: true,
             course: { select: { title: true } },
+            batch: { select: { id: true, batchName: true } },
           },
         },
         programParticipations: {

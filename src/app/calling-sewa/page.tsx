@@ -71,22 +71,38 @@ export default function CallingSewaPage() {
       const pParams = new URLSearchParams();
       if (selectedVolunteer !== "ALL") pParams.append("volunteerId", selectedVolunteer);
       if (selectedCampaign !== "ALL") {
-        pParams.append("source", selectedCampaign);
-        pParams.append("tag", selectedCampaign);
+        pParams.append("batch", selectedCampaign);
       }
 
       const pRes = await fetch(`/api/people?${pParams.toString()}`);
       const pData = await pRes.json();
       if (Array.isArray(pData)) setPeople(pData);
 
-      // 3. Extract unique batches & campaigns across CRM members
+      // 3. Extract unique batches & campaigns across CRM members + Course Batches
+      const campSet = new Set<string>();
+
+      try {
+        const courseRes = await fetch("/api/courses");
+        const courseData = await courseRes.json();
+        if (Array.isArray(courseData)) {
+          courseData.forEach((c: any) => {
+            if (Array.isArray(c.batches)) {
+              c.batches.forEach((b: any) => {
+                if (b.batchName) campSet.add(b.batchName.trim());
+              });
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Error fetching course batches for filter:", e);
+      }
+
       const allRes = await fetch("/api/people");
       const allData = await allRes.json();
       if (Array.isArray(allData)) {
-        const campSet = new Set<string>();
         allData.forEach((p: any) => {
           if (p.source && p.source !== "Excel Import" && p.source !== "Reference") {
-            campSet.add(p.source);
+            campSet.add(p.source.trim());
           }
           if (p.tags) {
             p.tags.split(",").forEach((t: string) => {
@@ -95,8 +111,8 @@ export default function CallingSewaPage() {
             });
           }
         });
-        setAvailableCampaigns(Array.from(campSet));
       }
+      setAvailableCampaigns(Array.from(campSet));
 
       // 4. Fetch followups
       const fUrl = selectedVolunteer !== "ALL" ? `/api/followups?volunteerId=${selectedVolunteer}` : "/api/followups";
@@ -437,6 +453,18 @@ export default function CallingSewaPage() {
                       <Badge variant="morpankh" size="sm">{person.stage}</Badge>
                       <span className="text-xs font-mono text-stone-600 font-semibold">+91 {person.mobile}</span>
                       {person.area && <span className="text-[11px] text-stone-500">• {person.area}</span>}
+                      {person.courseEnrollments && person.courseEnrollments.length > 0 && (
+                        person.courseEnrollments.map((enr: any) => (
+                          <span
+                            key={enr.id}
+                            className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1"
+                            title={`Enrolled in ${enr.course?.title || "Course"} (${enr.batch?.batchName || "Batch"})`}
+                          >
+                            <span>🎓</span>
+                            <span>{enr.batch?.batchName || enr.course?.title}</span>
+                          </span>
+                        ))
+                      )}
                       {person.tags && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
                           🏷️ {person.tags}
