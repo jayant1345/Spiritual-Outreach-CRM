@@ -184,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-white hover:bg-[#08415C] text-[#08415C] hover:text-white border-2 border-dashed border-[#D4AF37] rounded-xl font-semibold text-xs transition duration-200 shadow-sm group"
             >
               <Plus className="w-4 h-4 text-[#D4AF37] group-hover:rotate-90 transition-transform duration-200" />
-              <span>Add New Seeker</span>
+              <span>Add New Member</span>
             </button>
           </div>
         )}
