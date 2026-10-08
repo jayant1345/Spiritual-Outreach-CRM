@@ -46,14 +46,25 @@ export default function AttendanceHubPage() {
               Faculty: {course.facultyName} • Venue: {course.venue}
             </p>
 
-            <div className="pt-2 border-t border-[#E5D8B8]/60 flex justify-end">
-              <Link
-                href={`/courses/${course.id}`}
-                className="px-4 py-2 bg-[#08415C] hover:bg-[#0B4F6C] text-white text-xs font-semibold rounded-xl border border-[#D4AF37]/50 shadow-gold flex items-center gap-1.5 transition"
-              >
-                <span>Launch Attendance Matrix</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+            <div className="pt-3 border-t border-[#E5D8B8]/60 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-[#08415C]/80">
+                👥 {course._count?.enrollments || course.enrollments?.length || 0} Enrolled
+              </span>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/courses/${course.id}`}
+                  className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 transition active:scale-95"
+                >
+                  <span>⚡ Fatafat Check-In</span>
+                </Link>
+                <Link
+                  href={`/courses/${course.id}`}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-50 text-[#08415C] text-xs font-medium rounded-xl border border-[#D4AF37]/50 shadow-sm flex items-center gap-1 transition"
+                >
+                  <span>Full Matrix</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#78909C]" />
+                </Link>
+              </div>
             </div>
           </div>
         ))}

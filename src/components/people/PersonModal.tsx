@@ -65,12 +65,80 @@ export const PersonModal: React.FC<PersonModalProps> = ({
   const [newNote, setNewNote] = useState("");
   const [actionSubmitting, setActionSubmitting] = useState(false);
 
+  // Direct Course & Batch Enrollment State
+  const [coursesList, setCoursesList] = useState<any[]>([]);
+  const [isEnrollingCourse, setIsEnrollingCourse] = useState(false);
+  const [selectedEnrollBatchId, setSelectedEnrollBatchId] = useState("");
+  const [enrollingLoading, setEnrollingLoading] = useState(false);
+
   useEffect(() => {
     if (isOpen && personId) {
       fetchPersonDetails(personId);
+      fetchCoursesList();
       setIsEditing(false);
+      setIsEnrollingCourse(false);
+      setSelectedEnrollBatchId("");
     }
   }, [isOpen, personId]);
+
+  const fetchCoursesList = async () => {
+    try {
+      const res = await fetch("/api/courses");
+      const data = await res.json();
+      if (Array.isArray(data)) setCoursesList(data);
+    } catch (err) {
+      console.error("Error loading courses:", err);
+    }
+  };
+
+  const handleEnrollInBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEnrollBatchId || !personId) return;
+    setEnrollingLoading(true);
+    try {
+      const res = await fetch("/api/courses/enroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          batchId: selectedEnrollBatchId,
+          personId: personId,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setIsEnrollingCourse(false);
+        setSelectedEnrollBatchId("");
+        fetchPersonDetails(personId);
+        if (onPersonUpdated) onPersonUpdated();
+      } else {
+        alert(data.error || "Enrollment failed");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setEnrollingLoading(false);
+    }
+  };
+
+  const handleUnenrollFromBatch = async (enrollmentId: string, batchName: string) => {
+    if (!confirm(`Are you sure you want to remove ${person?.fullName} from batch "${batchName}"?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/courses/enroll?enrollmentId=${enrollmentId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        fetchPersonDetails(personId!);
+        if (onPersonUpdated) onPersonUpdated();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to remove member");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchPersonDetails = async (id: string) => {
     setLoading(true);
@@ -475,25 +543,84 @@ export const PersonModal: React.FC<PersonModalProps> = ({
 
               {/* Course-Wise Attendance Matrix (Docx Section 1.5) */}
               <div className="p-4 bg-white border border-[#E5D8B8] rounded-2xl space-y-3 shadow-xs">
-                <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                <div className="flex items-center justify-between border-b border-stone-100 pb-2 flex-wrap gap-2">
                   <h5 className="text-xs font-bold uppercase tracking-wider text-[#08415C] flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 text-[#08415C]" /> Course-Wise Attendance & Batches
+                    <BookOpen className="w-3.5 h-3.5 text-[#08415C]" /> Course-Wise Attendance &amp; Batches
                   </h5>
-                  <span className="text-[10px] text-stone-500 font-medium">
-                    {person.courseEnrollments?.length || 0} Connected Courses
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-stone-500 font-medium">
+                      {person.courseEnrollments?.length || 0} Connected
+                    </span>
+                    {hasPermission("courses:manage") && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEnrollingCourse((prev) => !prev)}
+                        className="px-2.5 py-1 bg-[#08415C] hover:bg-[#063349] text-white rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-gold transition"
+                      >
+                        <Plus className="w-3 h-3 text-[#D4AF37]" />
+                        <span>+ Add Course / Batch</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* Inline Course & Batch Enrollment Selector */}
+                {isEnrollingCourse && (
+                  <form onSubmit={handleEnrollInBatch} className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2 text-xs">
+                    <span className="font-bold text-[#08415C] block">Select Course &amp; Batch for {person.fullName}:</span>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <select
+                        required
+                        value={selectedEnrollBatchId}
+                        onChange={(e) => setSelectedEnrollBatchId(e.target.value)}
+                        className="flex-1 p-2 bg-white border border-stone-300 rounded-lg text-xs font-semibold text-[#08415C] outline-none"
+                      >
+                        <option value="">Choose Course &amp; Batch...</option>
+                        {coursesList.map((c) => (
+                          <optgroup key={c.id} label={c.title}>
+                            {c.batches && c.batches.length > 0 ? (
+                              c.batches.map((b: any) => (
+                                <option key={b.id} value={b.id}>
+                                  {c.title} ➔ {b.batchName} ({b.scheduleInfo || "Weekly"})
+                                </option>
+                              ))
+                            ) : (
+                              <option disabled value="">(No active batches created in this course)</option>
+                            )}
+                          </optgroup>
+                        ))}
+                      </select>
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setIsEnrollingCourse(false)}
+                          className="px-3 py-1.5 border rounded-lg text-stone-600 font-bold bg-white hover:bg-stone-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={enrollingLoading || !selectedEnrollBatchId}
+                          className="px-3.5 py-1.5 bg-[#08415C] hover:bg-[#063349] text-white rounded-lg font-bold shadow-gold disabled:opacity-50 flex items-center gap-1"
+                        >
+                          <span>{enrollingLoading ? "Enrolling..." : "Enroll Now"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                )}
 
                 {person.courseEnrollments && person.courseEnrollments.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
                       <thead>
                         <tr className="border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500">
-                          <th className="py-2">Course</th>
+                          <th className="py-2">Course &amp; Batch</th>
                           <th className="py-2">Registered</th>
                           <th className="py-2">Attendance</th>
                           <th className="py-2">Regular</th>
                           <th className="py-2">Status</th>
+                          {hasPermission("courses:manage") && <th className="py-2 text-right">Action</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-stone-100">
@@ -532,6 +659,18 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                                   {enr.status || "Active"}
                                 </span>
                               </td>
+                              {hasPermission("courses:manage") && (
+                                <td className="py-2.5 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUnenrollFromBatch(enr.id, enr.batch?.batchName || enr.course?.title)}
+                                    className="p-1 hover:bg-rose-50 text-stone-400 hover:text-rose-600 rounded transition"
+                                    title="Remove member from this batch"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              )}
                             </tr>
                           );
                         })}
@@ -539,8 +678,23 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                     </table>
                   </div>
                 ) : (
-                  <div className="p-4 bg-stone-50 rounded-xl text-center text-xs text-stone-500">
-                    No course enrollments linked yet. Enroll member from Courses & Batches module.
+                  <div className="p-4 bg-stone-50 rounded-xl text-center space-y-2.5">
+                    <p className="text-xs text-stone-500">
+                      No course enrollments linked yet to {person.fullName}.
+                    </p>
+                    {hasPermission("courses:manage") && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEnrollingCourse(true);
+                          if (coursesList.length === 0) fetchCoursesList();
+                        }}
+                        className="px-3.5 py-1.5 bg-[#08415C] hover:bg-[#063349] text-white rounded-xl text-xs font-bold shadow-gold inline-flex items-center gap-1.5 transition"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-[#D4AF37]" />
+                        <span>+ Enroll {person.fullName} in Course / Batch</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

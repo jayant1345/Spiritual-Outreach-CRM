@@ -17,6 +17,10 @@ export async function GET(
                 person: {
                   include: {
                     assignedVolunteer: true,
+                    callLogs: {
+                      orderBy: { createdAt: "desc" },
+                      take: 5,
+                    },
                   },
                 },
                 attendances: {
