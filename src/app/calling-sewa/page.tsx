@@ -296,14 +296,14 @@ export default function CallingSewaPage() {
 
                     <button
                       onClick={() => openCallModal(person)}
-                      className="px-2.5 py-1.5 bg-[#00A896] hover:bg-[#028090] text-white text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1 transition"
+                      className="flex-1 sm:flex-initial px-3 py-2 sm:py-1.5 bg-[#00A896] hover:bg-[#028090] text-white text-xs font-semibold rounded-xl sm:rounded-lg shadow-xs flex items-center justify-center gap-1.5 transition"
                       title="Click to Dial"
                     >
                       <PhoneCall className="w-3.5 h-3.5" /> <span>Call</span>
                     </button>
                     <button
                       onClick={() => openWhatsAppModal(person)}
-                      className="px-2.5 py-1.5 bg-[#08415C] hover:bg-[#0B4F6C] text-white text-xs font-semibold rounded-lg border border-[#D4AF37]/50 shadow-xs flex items-center gap-1 transition"
+                      className="flex-1 sm:flex-initial px-3 py-2 sm:py-1.5 bg-[#08415C] hover:bg-[#0B4F6C] text-white text-xs font-semibold rounded-xl sm:rounded-lg border border-[#D4AF37]/50 shadow-xs flex items-center justify-center gap-1.5 transition"
                       title="Send WhatsApp"
                     >
                       <MessageSquare className="w-3.5 h-3.5 text-[#D4AF37]" /> <span>WhatsApp</span>

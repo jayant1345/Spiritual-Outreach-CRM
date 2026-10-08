@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import MobileBottomNav from "./MobileBottomNav";
 import AddPersonModal from "../people/AddPersonModal";
 import CallActionModal from "../calling/CallActionModal";
 import SendWhatsAppModal from "../whatsapp/SendWhatsAppModal";
@@ -114,7 +115,8 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
             onOpenAddPerson={() => setIsAddPersonOpen(true)}
             onOpenMobileMenu={() => setMobileNavOpen(true)}
           />
-          <main className="flex-1 p-3.5 sm:p-8 max-w-7xl w-full mx-auto min-w-0">{children}</main>
+          <main className="flex-1 p-3 sm:p-8 max-w-7xl w-full mx-auto min-w-0 pb-20 lg:pb-8">{children}</main>
+          <MobileBottomNav onOpenMobileMenu={() => setMobileNavOpen(true)} />
         </div>
 
         <AddPersonModal

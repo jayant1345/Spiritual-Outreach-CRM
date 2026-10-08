@@ -46,7 +46,7 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-[#08415C]/40 backdrop-blur-sm transition-opacity"
@@ -55,28 +55,28 @@ export const Modal: React.FC<ModalProps> = ({
 
       {/* Modal Container */}
       <div
-        className={`relative w-full ${maxWidthClasses[maxWidth]} bg-[#FFFFFF] border border-[#E5D8B8] rounded-2xl shadow-gold-lg overflow-hidden transform transition-all z-10 my-8`}
+        className={`relative w-full ${maxWidthClasses[maxWidth]} bg-[#FFFFFF] border border-[#E5D8B8] rounded-2xl shadow-gold-lg overflow-hidden transform transition-all z-10 my-auto sm:my-8 max-h-[92vh] flex flex-col`}
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-5 sm:p-6 border-b border-[#E5D8B8]/70 bg-[#FAF8F5]">
+        <div className="flex items-start justify-between p-3.5 sm:p-6 border-b border-[#E5D8B8]/70 bg-[#FAF8F5] flex-shrink-0">
           <div>
-            <h3 className="text-xl sm:text-2xl font-serif text-[#08415C] font-semibold flex items-center gap-2">
+            <h3 className="text-lg sm:text-2xl font-serif text-[#08415C] font-semibold flex items-center gap-2">
               <span className="text-[#D4AF37]">🪷</span> {title}
             </h3>
             {subtitle && (
-              <p className="text-xs sm:text-sm text-[#37474F] mt-1">{subtitle}</p>
+              <p className="text-[11px] sm:text-sm text-[#37474F] mt-0.5">{subtitle}</p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="text-[#78909C] hover:text-[#08415C] hover:bg-[#F5F1EB] p-2 rounded-full transition-colors"
+            className="text-[#78909C] hover:text-[#08415C] hover:bg-[#F5F1EB] p-1.5 sm:p-2 rounded-full transition-colors flex-shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-5 sm:p-6 max-h-[78vh] overflow-y-auto">{children}</div>
+        <div className="p-3.5 sm:p-6 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   );

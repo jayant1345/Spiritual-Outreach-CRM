@@ -220,22 +220,24 @@ export default function WhatsAppStudioPage() {
               </div>
 
               {/* Devotee Variable Resolver Preview Pill */}
-              <div className="flex items-center gap-2 text-xs bg-[#FAF8F5] p-2.5 rounded-xl border border-[#E5D8B8]">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 text-xs bg-[#FAF8F5] p-2.5 rounded-xl border border-[#E5D8B8]">
                 <span className="font-semibold text-[#08415C]">Testing with Devotee:</span>
-                <input
-                  type="text"
-                  value={testName}
-                  onChange={(e) => setTestName(e.target.value)}
-                  className="px-2 py-1 bg-white border border-[#E5D8B8] rounded text-xs font-medium w-36"
-                  placeholder="Devotee Name"
-                />
-                <input
-                  type="text"
-                  value={testPhone}
-                  onChange={(e) => setTestPhone(e.target.value)}
-                  className="px-2 py-1 bg-white border border-[#E5D8B8] rounded text-xs font-medium w-32"
-                  placeholder="10-digit phone"
-                />
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <input
+                    type="text"
+                    value={testName}
+                    onChange={(e) => setTestName(e.target.value)}
+                    className="px-2 py-1 bg-white border border-[#E5D8B8] rounded text-xs font-medium flex-1 sm:w-36"
+                    placeholder="Devotee Name"
+                  />
+                  <input
+                    type="text"
+                    value={testPhone}
+                    onChange={(e) => setTestPhone(e.target.value)}
+                    className="px-2 py-1 bg-white border border-[#E5D8B8] rounded text-xs font-medium flex-1 sm:w-32"
+                    placeholder="10-digit phone"
+                  />
+                </div>
               </div>
 
               {/* Simulated Phone Screen */}

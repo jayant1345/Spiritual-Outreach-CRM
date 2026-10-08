@@ -53,24 +53,24 @@ export default function TodaysWorkPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-serif font-bold text-[#08415C] flex items-center gap-2.5">
-            <CheckSquare className="w-6 h-6 text-[#D4AF37]" />
+          <h2 className="text-xl sm:text-3xl font-serif font-bold text-[#08415C] flex items-center gap-2">
+            <CheckSquare className="w-5 h-5 sm:w-6 sm:h-6 text-[#D4AF37]" />
             Today&apos;s Work & Action Center
           </h2>
-          <p className="text-xs text-[#78909C] mt-0.5">
+          <p className="text-[11px] sm:text-xs text-[#78909C] mt-0.5">
             Personalized daily tasks: Pending calls, callbacks, absent follow-ups, and scheduled check-ins
           </p>
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1 p-1 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold shadow-sm">
+        <div className="flex items-center gap-1 p-1 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold shadow-xs overflow-x-auto w-full sm:w-auto">
           <button
             onClick={() => setFilterStatus("PENDING")}
-            className={`px-3 py-1.5 rounded-lg transition ${
+            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap flex-shrink-0 ${
               filterStatus === "PENDING"
-                ? "bg-[#08415C] text-white shadow-sm"
+                ? "bg-[#08415C] text-white shadow-xs"
                 : "text-[#37474F] hover:bg-[#FAF8F5]"
             }`}
           >
@@ -78,9 +78,9 @@ export default function TodaysWorkPage() {
           </button>
           <button
             onClick={() => setFilterStatus("COMPLETED")}
-            className={`px-3 py-1.5 rounded-lg transition ${
+            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap flex-shrink-0 ${
               filterStatus === "COMPLETED"
-                ? "bg-[#08415C] text-white shadow-sm"
+                ? "bg-[#08415C] text-white shadow-xs"
                 : "text-[#37474F] hover:bg-[#FAF8F5]"
             }`}
           >
@@ -88,9 +88,9 @@ export default function TodaysWorkPage() {
           </button>
           <button
             onClick={() => setFilterStatus("ALL")}
-            className={`px-3 py-1.5 rounded-lg transition ${
+            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap flex-shrink-0 ${
               filterStatus === "ALL"
-                ? "bg-[#08415C] text-white shadow-sm"
+                ? "bg-[#08415C] text-white shadow-xs"
                 : "text-[#37474F] hover:bg-[#FAF8F5]"
             }`}
           >

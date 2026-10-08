@@ -38,6 +38,7 @@ export default function PeoplePage() {
   const [volunteers, setVolunteers] = useState<any[]>([]);
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Bulk action states
   const [bulkVolunteerId, setBulkVolunteerId] = useState("");
@@ -205,19 +206,38 @@ export default function PeoplePage() {
 
       {/* Multi-Dimensional Filter Control Bar */}
       <div className="gold-card p-3 sm:p-4 space-y-3 shadow-xs">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-          {/* Universal Search */}
-          <div className="relative">
+        {/* Search Bar & Mobile Filter Button */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#78909C]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search name, phone, area..."
-              className="w-full pl-9 pr-3 py-1.5 bg-white border border-[#E5D8B8] rounded-xl text-xs text-[#0B192C] focus:outline-none focus:border-[#08415C]"
+              className="w-full pl-9 pr-3 py-2 bg-white border border-[#E5D8B8] rounded-xl text-xs text-[#0B192C] focus:outline-none focus:border-[#08415C]"
             />
           </div>
 
+          <button
+            type="button"
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+            className={`sm:hidden px-3 py-2 border rounded-xl text-xs font-semibold flex items-center gap-1.5 transition flex-shrink-0 ${
+              (selectedArea !== "ALL" || selectedStage !== "ALL" || selectedSource !== "ALL" || selectedVolunteer !== "ALL") || showMobileFilters
+                ? "bg-[#08415C] text-white border-[#08415C]"
+                : "bg-white text-stone-700 border-[#E5D8B8]"
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>Filters</span>
+            {(selectedArea !== "ALL" || selectedStage !== "ALL" || selectedSource !== "ALL" || selectedVolunteer !== "ALL") && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
+            )}
+          </button>
+        </div>
+
+        {/* Filter Dropdowns Grid (Always visible on tablet/desktop, toggleable on mobile) */}
+        <div className={`${showMobileFilters ? "grid" : "hidden sm:grid"} grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1 border-t sm:border-t-0 border-[#E5D8B8]/50`}>
           {/* Area Filter */}
           <div>
             <select
