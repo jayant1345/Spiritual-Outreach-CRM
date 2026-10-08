@@ -26,8 +26,9 @@ export default function CallingSewaPage() {
   const { openPersonModal, openCallModal, openWhatsAppModal, refreshTrigger } = useContext(CRMContext);
   const { user, hasPermission } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"calling" | "relationship" | "followups">("calling");
+  const [activeTab, setActiveTab] = useState<"calling" | "calls_done" | "relationship" | "followups">("calling");
   const [people, setPeople] = useState<any[]>([]);
+  const [callLogs, setCallLogs] = useState<any[]>([]);
   const [followups, setFollowups] = useState<any[]>([]);
   const [volunteers, setVolunteers] = useState<any[]>([]);
   const [selectedVolunteer, setSelectedVolunteer] = useState("ALL");
@@ -36,6 +37,19 @@ export default function CallingSewaPage() {
   // Reassignment modal or state
   const [reassigningId, setReassigningId] = useState<string | null>(null);
   const [targetVolunteerId, setTargetVolunteerId] = useState("");
+
+  // Read URL query params on initial mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const volId = params.get("volunteerId");
+      const tab = params.get("tab");
+      if (volId) setSelectedVolunteer(volId);
+      if (tab && (tab === "calling" || tab === "calls_done" || tab === "relationship" || tab === "followups")) {
+        setActiveTab(tab as any);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -60,6 +74,12 @@ export default function CallingSewaPage() {
       const fRes = await fetch(fUrl);
       const fData = await fRes.json();
       if (Array.isArray(fData)) setFollowups(fData);
+
+      // 4. Fetch calls done (call logs)
+      const cUrl = selectedVolunteer !== "ALL" ? `/api/calls?volunteerId=${selectedVolunteer}` : "/api/calls";
+      const cRes = await fetch(cUrl);
+      const cData = await cRes.json();
+      if (Array.isArray(cData)) setCallLogs(cData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -94,6 +114,29 @@ export default function CallingSewaPage() {
     }
   };
 
+  const getOutcomeBadgeClass = (outcome: string) => {
+    switch (outcome) {
+      case "CONNECTED":
+      case "YES_WILL_ATTEND":
+        return "bg-emerald-50 text-emerald-800 border-emerald-300";
+      case "CALL_BACK":
+      case "INTERESTED":
+        return "bg-blue-50 text-blue-800 border-blue-300";
+      case "MAYBE":
+        return "bg-amber-50 text-amber-800 border-amber-300";
+      case "NO_ANSWER":
+        return "bg-orange-50 text-orange-800 border-orange-300";
+      case "NOT_INTERESTED":
+      case "WRONG_NUMBER":
+      case "DO_NOT_CONTACT":
+        return "bg-rose-50 text-rose-800 border-rose-300";
+      default:
+        return "bg-stone-50 text-stone-800 border-stone-300";
+    }
+  };
+
+  const selectedVolunteerObj = volunteers.find((v) => v.id === selectedVolunteer);
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
@@ -123,45 +166,111 @@ export default function CallingSewaPage() {
               ))}
             </select>
           </div>
+          {selectedVolunteer !== "ALL" && (
+            <button
+              type="button"
+              onClick={() => setSelectedVolunteer("ALL")}
+              className="px-2.5 py-1.5 text-xs text-stone-600 hover:text-stone-900 bg-stone-100 rounded-xl"
+              title="Reset caller filter"
+            >
+              Reset
+            </button>
+          )}
         </div>
       </div>
 
       {/* Volunteer Workload Distribution Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-        {volunteers.map((vol) => (
-          <div
-            key={vol.id}
-            onClick={() => setSelectedVolunteer(selectedVolunteer === vol.id ? "ALL" : vol.id)}
-            className={`gold-card p-3 sm:p-4 cursor-pointer transition shadow-xs ${
-              selectedVolunteer === vol.id
-                ? "ring-2 ring-[#08415C] border-[#D4AF37] bg-[#FAF5E6]/40"
-                : "hover:border-[#D4AF37]"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="font-serif font-bold text-xs sm:text-sm text-[#08415C] flex items-center gap-1.5 truncate">
-                <div className="w-6 h-6 rounded-full bg-[#08415C] text-[#D4AF37] text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                  {vol.name.split(" ").map((n: string) => n[0]).join("")}
+        {volunteers.map((vol) => {
+          const isSelected = selectedVolunteer === vol.id;
+          return (
+            <div
+              key={vol.id}
+              className={`gold-card p-3 sm:p-4 transition shadow-xs flex flex-col justify-between ${
+                isSelected
+                  ? "ring-2 ring-[#08415C] border-[#D4AF37] bg-[#FAF5E6]/40"
+                  : "hover:border-[#D4AF37]"
+              }`}
+            >
+              <div
+                className="flex items-center justify-between mb-1.5 cursor-pointer"
+                onClick={() => setSelectedVolunteer(isSelected ? "ALL" : vol.id)}
+                title="Tap to filter by this caller"
+              >
+                <div className="font-serif font-bold text-xs sm:text-sm text-[#08415C] flex items-center gap-1.5 truncate">
+                  <div className="w-6 h-6 rounded-full bg-[#08415C] text-[#D4AF37] text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                    {vol.name.split(" ").map((n: string) => n[0]).join("")}
+                  </div>
+                  <span className="truncate">{vol.name}</span>
                 </div>
-                <span className="truncate">{vol.name}</span>
+                {isSelected && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#08415C] text-white font-bold">
+                    Active
+                  </span>
+                )}
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-1.5 text-center text-xs mt-2">
-              <div className="p-1.5 bg-[#FAF8F5] rounded-lg border border-[#E5D8B8]">
-                <div className="font-bold text-[#08415C] text-xs sm:text-sm">{vol._count?.assignedPeople || 0}</div>
-                <div className="text-[9px] sm:text-[10px] text-[#78909C]">Allocated</div>
-              </div>
-              <div className="p-1.5 bg-emerald-50 rounded-lg border border-emerald-200">
-                <div className="font-bold text-[#00A896] text-xs sm:text-sm">{vol._count?.callLogs || 0}</div>
-                <div className="text-[9px] sm:text-[10px] text-[#00A896]">Calls Done</div>
+              <div className="grid grid-cols-2 gap-1.5 text-center text-xs mt-2">
+                {/* Box 1: Allocated (To Call) -> Clicks directly into To Call Queue */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedVolunteer(vol.id);
+                    setActiveTab("calling");
+                  }}
+                  className={`p-1.5 rounded-lg border text-center transition cursor-pointer ${
+                    isSelected && activeTab === "calling"
+                      ? "bg-[#08415C] text-white border-[#08415C] shadow-xs"
+                      : "bg-[#FAF8F5] border-[#E5D8B8] hover:border-[#08415C] text-stone-800"
+                  }`}
+                  title="Click to view allocated devotees to call"
+                >
+                  <div className={`font-bold text-xs sm:text-sm ${
+                    isSelected && activeTab === "calling" ? "text-white" : "text-[#08415C]"
+                  }`}>
+                    {vol._count?.assignedPeople || 0}
+                  </div>
+                  <div className={`text-[9px] sm:text-[10px] ${
+                    isSelected && activeTab === "calling" ? "text-white/80" : "text-[#78909C]"
+                  }`}>
+                    To Call
+                  </div>
+                </button>
+
+                {/* Box 2: Calls Done -> Clicks directly into Calls Done Log */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedVolunteer(vol.id);
+                    setActiveTab("calls_done");
+                  }}
+                  className={`p-1.5 rounded-lg border text-center transition cursor-pointer ${
+                    isSelected && activeTab === "calls_done"
+                      ? "bg-[#00A896] text-white border-[#00A896] shadow-xs"
+                      : "bg-emerald-50 border-emerald-200 hover:border-[#00A896] text-emerald-900"
+                  }`}
+                  title="Click to view completed calls done by this caller"
+                >
+                  <div className={`font-bold text-xs sm:text-sm ${
+                    isSelected && activeTab === "calls_done" ? "text-white" : "text-[#00A896]"
+                  }`}>
+                    {vol._count?.callLogs || 0}
+                  </div>
+                  <div className={`text-[9px] sm:text-[10px] ${
+                    isSelected && activeTab === "calls_done" ? "text-white/80" : "text-[#00A896]"
+                  }`}>
+                    Calls Done
+                  </div>
+                </button>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Unified Section Navigation Tabs (Calling + Relationship + Follow-ups) */}
+      {/* Unified Section Navigation Tabs (To Call Queue + Calls Done + Relationship + Follow-ups) */}
       <div className="flex border-b border-[#E5D8B8] pb-1 gap-2 text-xs font-bold overflow-x-auto">
         <button
           type="button"
@@ -173,7 +282,20 @@ export default function CallingSewaPage() {
           }`}
         >
           <PhoneCall className="w-3.5 h-3.5" />
-          <span>Calling Desk ({people.length})</span>
+          <span>To Call ({people.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("calls_done")}
+          className={`py-2 px-3.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap ${
+            activeTab === "calls_done"
+              ? "bg-[#00A896] text-white shadow-xs"
+              : "bg-white text-stone-700 hover:bg-emerald-50 border border-emerald-200"
+          }`}
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 text-[#00A896]" />
+          <span>Calls Done ({callLogs.length})</span>
         </button>
 
         <button
@@ -203,12 +325,17 @@ export default function CallingSewaPage() {
         </button>
       </div>
 
-      {/* TAB CONTENT 1 & 2: Calling Queue & Relationship List */}
+      {/* TAB CONTENT 1: To Call / Allocated Queue */}
       {(activeTab === "calling" || activeTab === "relationship") && (
         <div className="gold-card p-3.5 sm:p-5 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between text-xs text-stone-500 pb-2 border-b border-stone-100">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs text-stone-500 pb-2 border-b border-stone-100 gap-1.5">
             <span>
-              Showing <strong>{people.length}</strong> devotees in queue
+              Showing <strong>{people.length}</strong> devotees to call
+              {selectedVolunteer !== "ALL" && selectedVolunteerObj && (
+                <span className="font-semibold text-[#08415C]">
+                  {" "}allocated to {selectedVolunteerObj.name}
+                </span>
+              )}
             </span>
             <span className="text-[11px] text-[#08415C] font-semibold hidden sm:inline">
               Tap Call or WhatsApp to open zero-cost instant communication
@@ -222,8 +349,27 @@ export default function CallingSewaPage() {
                 <p>Loading calling queue...</p>
               </div>
             ) : people.length === 0 ? (
-              <div className="p-8 text-center text-xs text-stone-500">
-                No devotees found in this queue.
+              <div className="p-8 text-center text-xs text-stone-500 bg-white rounded-xl border border-stone-200 space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                <p className="font-semibold text-stone-700">No pending devotees in this queue.</p>
+                {selectedVolunteer !== "ALL" && selectedVolunteerObj && (
+                  <div className="text-stone-500 max-w-md mx-auto">
+                    {selectedVolunteerObj.name} has{" "}
+                    <strong className="text-emerald-700 font-bold">
+                      {selectedVolunteerObj._count?.callLogs || 0} completed calls
+                    </strong>
+                    .
+                    <div className="mt-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("calls_done")}
+                        className="px-3.5 py-1.5 bg-[#00A896] hover:bg-[#028090] text-white font-bold rounded-lg transition"
+                      >
+                        View {selectedVolunteerObj.name}&apos;s Completed Calls ({selectedVolunteerObj._count?.callLogs || 0})
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               people.map((person) => (
@@ -246,13 +392,12 @@ export default function CallingSewaPage() {
 
                     <div className="text-[11px] text-stone-500 mt-1 flex items-center gap-3 flex-wrap">
                       <span>Caller: <strong>{person.assignedVolunteer?.name || "Unassigned"}</strong></span>
-                      {person.notes && <span className="italic line-clamp-1">"{person.notes}"</span>}
+                      {person.notes && <span className="italic line-clamp-1">&quot;{person.notes}&quot;</span>}
                     </div>
                   </div>
 
                   {/* Actions & Reassignment */}
                   <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-                    {/* Option to reassign to other volunteers (Docx requirement 4) */}
                     {hasPermission("calling:assign") && (
                       reassigningId === person.id ? (
                         <div className="flex items-center gap-1 bg-stone-50 p-1 rounded-lg border border-stone-200">
@@ -318,6 +463,129 @@ export default function CallingSewaPage() {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT 2: Calls Done / Completed Outreach Calls History */}
+      {activeTab === "calls_done" && (
+        <div className="gold-card p-3.5 sm:p-5 space-y-3 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs text-stone-500 pb-2 border-b border-stone-100 gap-2">
+            <span>
+              Showing <strong>{callLogs.length}</strong> calls completed
+              {selectedVolunteer !== "ALL" && selectedVolunteerObj && (
+                <span className="font-semibold text-[#08415C]">
+                  {" "}logged by {selectedVolunteerObj.name}
+                </span>
+              )}
+            </span>
+            <span className="text-[11px] text-[#00A896] font-semibold">
+              Historical record of all outreach calls & responses
+            </span>
+          </div>
+
+          <div className="space-y-2.5">
+            {loading ? (
+              <div className="p-12 text-center text-xs text-stone-500">
+                <div className="inline-block animate-spin text-2xl text-[#D4AF37] mb-2">🪷</div>
+                <p>Loading completed calls...</p>
+              </div>
+            ) : callLogs.length === 0 ? (
+              <div className="p-8 text-center text-xs text-stone-500 bg-white rounded-xl border border-stone-200 space-y-1">
+                <CheckCircle2 className="w-8 h-8 text-stone-300 mx-auto mb-1" />
+                <p className="font-semibold text-stone-700">No completed calls logged yet for this selection.</p>
+                <p className="text-[11px] text-stone-400">
+                  Switch to the &quot;To Call&quot; queue and tap &quot;Call&quot; to dial devotees and record outcomes.
+                </p>
+              </div>
+            ) : (
+              callLogs.map((log) => {
+                const outcomeColor = getOutcomeBadgeClass(log.outcome);
+                return (
+                  <div
+                    key={log.id}
+                    className="p-3.5 bg-white border border-[#E5D8B8] rounded-xl hover:border-[#00A896] transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs"
+                  >
+                    <div
+                      className="cursor-pointer flex-1 min-w-0"
+                      onClick={() => {
+                        if (log.person?.id) openPersonModal(log.person.id);
+                      }}
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-serif font-bold text-sm text-[#08415C] hover:underline">
+                          {log.person?.fullName || "Devotee"}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${outcomeColor}`}>
+                          {log.outcome.replace(/_/g, " ")}
+                        </span>
+                        <span className="text-xs font-mono text-stone-600 font-semibold">
+                          +91 {log.person?.mobile}
+                        </span>
+                        {log.person?.area && (
+                          <span className="text-[11px] text-stone-500">• {log.person.area}</span>
+                        )}
+                      </div>
+
+                      <div className="text-[11px] text-stone-600 mt-1.5 flex items-center gap-2.5 flex-wrap">
+                        <span className="font-medium text-[#08415C]">
+                          Category: <strong>{log.callType}</strong>
+                        </span>
+                        <span>•</span>
+                        <span className="text-stone-500">
+                          Caller: <strong className="text-stone-700">{log.volunteer?.name || "Volunteer"}</strong>
+                        </span>
+                        <span>•</span>
+                        <span className="text-stone-400 font-mono text-[10px]">
+                          {new Date(log.createdAt).toLocaleString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+
+                      {log.notes && (
+                        <p className="text-xs text-stone-700 bg-[#FAF8F5] p-2 rounded-lg border border-[#E5D8B8] mt-2 italic leading-relaxed">
+                          &quot;{log.notes}&quot;
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap flex-shrink-0">
+                      {log.person && (
+                        <>
+                          <button
+                            onClick={() => openCallModal(log.person)}
+                            className="flex-1 sm:flex-initial px-3 py-1.5 bg-[#00A896] hover:bg-[#028090] text-white text-xs font-semibold rounded-lg shadow-xs flex items-center justify-center gap-1.5 transition"
+                            title="Call Again"
+                          >
+                            <PhoneCall className="w-3.5 h-3.5" /> <span>Call</span>
+                          </button>
+                          <button
+                            onClick={() => openWhatsAppModal(log.person)}
+                            className="flex-1 sm:flex-initial px-3 py-1.5 bg-[#08415C] hover:bg-[#0B4F6C] text-white text-xs font-semibold rounded-lg border border-[#D4AF37]/50 shadow-xs flex items-center justify-center gap-1.5 transition"
+                            title="Send WhatsApp"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-[#D4AF37]" /> <span>WhatsApp</span>
+                          </button>
+                          <button
+                            onClick={() => openPersonModal(log.person.id)}
+                            className="p-1.5 bg-stone-100 hover:bg-stone-200 text-[#08415C] rounded-lg transition"
+                            title="Open 360° Profile"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

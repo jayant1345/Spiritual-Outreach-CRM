@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import Badge from "@/components/common/Badge";
 import Modal from "@/components/common/Modal";
 import { UserCog, Phone, Mail, CheckCircle2, PhoneCall, Plus, Shield, Key, UserCheck, UserX, HeartHandshake, User } from "lucide-react";
@@ -210,20 +211,32 @@ export default function VolunteersPage() {
               </div>
 
               <div className="grid grid-cols-3 gap-2 text-center text-xs pt-2 border-t border-[#E5D8B8]/60">
-                <div className="p-2 bg-[#FAF8F5] rounded-xl border border-[#E5D8B8]">
-                  <div className="font-bold text-[#08415C]">
+                <Link
+                  href={`/calling-sewa?volunteerId=${vol.id}&tab=calling`}
+                  className="p-2 bg-[#FAF8F5] hover:bg-[#FAF5E6] rounded-xl border border-[#E5D8B8] transition cursor-pointer group"
+                  title="View allotted devotees queue"
+                >
+                  <div className="font-bold text-[#08415C] group-hover:underline">
                     {(vol._count?.assignedPeople || 0) + (vol._count?.relationshipPeople || 0)}
                   </div>
                   <div className="text-[10px] text-[#78909C]">Allotted Devotees</div>
-                </div>
-                <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-200">
-                  <div className="font-bold text-emerald-800">{vol._count?.callLogs || 0}</div>
+                </Link>
+                <Link
+                  href={`/calling-sewa?volunteerId=${vol.id}&tab=calls_done`}
+                  className="p-2 bg-emerald-50 hover:bg-emerald-100 rounded-xl border border-emerald-200 transition cursor-pointer group"
+                  title="View calls done log"
+                >
+                  <div className="font-bold text-emerald-800 group-hover:underline">{vol._count?.callLogs || 0}</div>
                   <div className="text-[10px] text-emerald-600">Calls Done</div>
-                </div>
-                <div className="p-2 bg-amber-50 rounded-xl border border-amber-200">
-                  <div className="font-bold text-amber-800">{vol._count?.followups || 0}</div>
+                </Link>
+                <Link
+                  href={`/calling-sewa?volunteerId=${vol.id}&tab=followups`}
+                  className="p-2 bg-amber-50 hover:bg-amber-100 rounded-xl border border-amber-200 transition cursor-pointer group"
+                  title="View pending tasks"
+                >
+                  <div className="font-bold text-amber-800 group-hover:underline">{vol._count?.followups || 0}</div>
                   <div className="text-[10px] text-amber-600">Pending Tasks</div>
-                </div>
+                </Link>
               </div>
             </div>
 

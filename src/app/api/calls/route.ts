@@ -1,10 +1,63 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const volunteerId = searchParams.get("volunteerId");
+    const personId = searchParams.get("personId");
+    const outcome = searchParams.get("outcome");
+    const limit = searchParams.get("limit");
+
+    const where: any = {};
+    if (volunteerId && volunteerId !== "ALL") {
+      where.volunteerId = volunteerId;
+    }
+    if (personId) {
+      where.personId = personId;
+    }
+    if (outcome && outcome !== "ALL") {
+      where.outcome = outcome;
+    }
+
+    const calls = await prisma.callLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit ? parseInt(limit) : 100,
+      include: {
+        person: {
+          select: {
+            id: true,
+            fullName: true,
+            mobile: true,
+            whatsappNumber: true,
+            area: true,
+            stage: true,
+            assignedVolunteerId: true,
+            relationshipVolunteerId: true,
+          },
+        },
+        volunteer: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(calls);
+  } catch (error: any) {
+    console.error("Error fetching call logs:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
-    const currentUser = await getCurrentUser();
+    const currentUser = await getCurrentUser(request);
     const body = await request.json();
     const {
       personId,
