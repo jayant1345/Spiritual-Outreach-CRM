@@ -54,12 +54,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (isCallingVolunteer) {
       return [
         {
-          groupTitle: "My Calling Sewa",
+          groupTitle: "My Seva",
           items: [
             { name: "Dashboard", href: "/", icon: LayoutDashboard },
             { name: "Today's Work", href: "/todays-work", icon: CheckSquare },
-            { name: "Calling Sewa Desk", href: "/calling-sewa", icon: PhoneCall },
-            { name: "My Follow-ups", href: "/followups", icon: CalendarClock },
+            { name: "Calling Desk", href: "/calling-sewa", icon: PhoneCall },
             { name: "WhatsApp Messages", href: "/whatsapp", icon: MessageSquare },
           ],
         },
@@ -73,18 +72,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           items: [
             { name: "Dashboard", href: "/", icon: LayoutDashboard },
             { name: "Today's Work", href: "/todays-work", icon: CheckSquare },
-            { name: "Relationship Calling", href: "/relationship-calling", icon: HeartHandshake },
-            { name: "My Follow-ups", href: "/followups", icon: CalendarClock },
-          ],
-        },
-        {
-          groupTitle: "Courses & Sadhana",
-          items: [
+            { name: "Devotee Calling & Care", href: "/calling-sewa", icon: HeartHandshake },
             { name: "Courses & Batches", href: "/courses", icon: GraduationCap },
             { name: "Attendance Matrix", href: "/attendance", icon: TableProperties },
-            { name: "Japa / Mala Tracker", href: "/japa", icon: CircleDot },
-            { name: "Spiritual Journey", href: "/spiritual-journey", icon: Scroll },
-            { name: "WhatsApp Outreach", href: "/whatsapp", icon: MessageSquare },
+            { name: "WhatsApp Messages", href: "/whatsapp", icon: MessageSquare },
           ],
         },
       ];
@@ -95,34 +86,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
         groupTitle: "Core Operations",
         items: [
           { name: "Dashboard", href: "/", icon: LayoutDashboard },
-          { name: "People (Master DB)", href: "/people", icon: Users },
+          { name: "Members Directory", href: "/people", icon: Users },
           { name: "Today's Work", href: "/todays-work", icon: CheckSquare },
-          { name: "Calling Sewa", href: "/calling-sewa", icon: PhoneCall },
-          { name: "Relationship Calling", href: "/relationship-calling", icon: HeartHandshake },
-          { name: "Follow-ups", href: "/followups", icon: CalendarClock },
+          { name: "Calling & Devotee Care", href: "/calling-sewa", icon: PhoneCall },
         ],
       },
       {
-        groupTitle: "Outreach & Learning",
+        groupTitle: "Courses & Outreach",
         items: [
-          { name: "WhatsApp Studio", href: "/whatsapp", icon: MessageSquare },
-          { name: "Programs & Events", href: "/programs", icon: CalendarDays },
           { name: "Courses & Batches", href: "/courses", icon: GraduationCap },
           { name: "Attendance Matrix", href: "/attendance", icon: TableProperties },
-        ],
-      },
-      {
-        groupTitle: "Spiritual Sadhana",
-        items: [
-          { name: "Spiritual Journey", href: "/spiritual-journey", icon: Scroll },
-          { name: "Japa / Mala Tracker", href: "/japa", icon: CircleDot },
-          { name: "Yatra & Activities", href: "/yatra", icon: Compass },
+          { name: "WhatsApp Broadcast", href: "/whatsapp", icon: MessageSquare },
         ],
       },
       {
         groupTitle: "Administration",
         items: [
-          { name: "Team & Volunteers", href: "/volunteers", icon: UserCog },
+          { name: "Team & Access Rights", href: "/volunteers", icon: UserCog },
           { name: "Reports & Analytics", href: "/reports", icon: BarChart3 },
           { name: "Settings", href: "/settings", icon: Sliders },
         ],

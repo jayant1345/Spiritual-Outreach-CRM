@@ -7,3 +7,5 @@ prisma/dev.db-journal
 .env.local
 .DS_Store
 *.log
+docx_content.txt
+tsconfig.tsbuildinfo

@@ -1,6 +1,7 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { verifyPassword, createSessionToken, AUTH_COOKIE, SessionUser } from "@/lib/auth";
+import { verifyPassword, createSessionToken, AUTH_COOKIE, SessionUser, SESSION_MAX_AGE_SECONDS } from "@/lib/auth";
+import { getEffectivePermissions } from "@/lib/permissions";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,12 +14,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const cleanIdentifier = identifier.toLowerCase().trim();
+    const rawTrimmed = identifier.trim();
+
     const user = await prisma.user.findFirst({
       where: {
         OR: [
-          { email: identifier.toLowerCase().trim() },
-          { username: identifier.toLowerCase().trim() },
-          { phone: identifier.trim() },
+          { email: cleanIdentifier },
+          { username: cleanIdentifier },
+          { phone: rawTrimmed },
         ],
         active: true,
       },
@@ -44,6 +48,9 @@ export async function POST(req: NextRequest) {
       data: { lastLogin: new Date() },
     });
 
+    const parsedPrivileges = user.privileges ? JSON.parse(user.privileges) : null;
+    const permissions = getEffectivePermissions(user.role, parsedPrivileges);
+
     const sessionUser: SessionUser = {
       id: user.id,
       name: user.name,
@@ -52,7 +59,8 @@ export async function POST(req: NextRequest) {
       phone: user.phone,
       role: user.role as SessionUser["role"],
       avatar: user.avatar,
-      privileges: user.privileges ? JSON.parse(user.privileges) : null,
+      privileges: parsedPrivileges,
+      permissions,
     };
 
     const token = createSessionToken(sessionUser);
@@ -60,15 +68,17 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({
       success: true,
       user: sessionUser,
+      token,
       message: `Welcome back, ${user.name}!`,
     });
 
+    // Persistent cookie for browser & PWA
     response.cookies.set(AUTH_COOKIE, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: SESSION_MAX_AGE_SECONDS,
     });
 
     return response;

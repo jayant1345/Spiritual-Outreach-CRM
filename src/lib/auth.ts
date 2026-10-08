@@ -1,9 +1,11 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 import { cookies } from "next/headers";
 import prisma from "./prisma";
+import { getEffectivePermissions, PermissionKey } from "./permissions";
 
 const AUTH_COOKIE_NAME = "chandkheda_crm_session";
 const SESSION_SECRET = process.env.SESSION_SECRET || "chandkheda-spiritual-crm-sacred-key-2026";
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 days persistent login
 
 export interface SessionUser {
   id: string;
@@ -14,6 +16,7 @@ export interface SessionUser {
   role: "SUPER_ADMIN" | "COORDINATOR" | "CALLING_VOLUNTEER" | "RELATIONSHIP_VOLUNTEER";
   avatar?: string | null;
   privileges?: string[] | null;
+  permissions?: PermissionKey[];
 }
 
 export function hashPassword(password: string): string {
@@ -35,7 +38,7 @@ export function createSessionToken(user: SessionUser): string {
     email: user.email,
     name: user.name,
     role: user.role,
-    exp: Date.now() + 1000 * 60 * 60 * 24 * 7,
+    exp: Date.now() + 1000 * SESSION_MAX_AGE_SECONDS,
   });
 
   const base64Payload = Buffer.from(payload).toString("base64url");
@@ -72,10 +75,39 @@ export function verifySessionToken(token: string): { id: string; email: string; 
   }
 }
 
-export async function getCurrentUser(): Promise<SessionUser | null> {
+export async function getCurrentUser(request?: Request): Promise<SessionUser | null> {
   try {
-    const cookieStore = cookies();
-    const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+    let token: string | undefined;
+
+    // 1. Check Bearer Authorization header (for PWA / cross-context storage)
+    if (request) {
+      const authHeader = request.headers.get("authorization");
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        token = authHeader.substring(7).trim();
+      }
+
+      // Also check cookie header on request if available
+      if (!token) {
+        const cookieHeader = request.headers.get("cookie");
+        if (cookieHeader) {
+          const match = cookieHeader.match(new RegExp(`(^|;\\s*)${AUTH_COOKIE_NAME}=([^;]+)`));
+          if (match) {
+            token = match[2];
+          }
+        }
+      }
+    }
+
+    // 2. Fallback to Next.js cookieStore
+    if (!token) {
+      try {
+        const cookieStore = cookies();
+        token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+      } catch (e) {
+        // cookies() might throw outside request lifecycle
+      }
+    }
+
     if (!token) return null;
 
     const payload = verifySessionToken(token);
@@ -97,6 +129,9 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 
     if (!user) return null;
 
+    const parsedPrivileges: string[] | null = user.privileges ? JSON.parse(user.privileges) : null;
+    const permissions = getEffectivePermissions(user.role, parsedPrivileges);
+
     return {
       id: user.id,
       name: user.name,
@@ -105,7 +140,8 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       phone: user.phone,
       role: user.role as SessionUser["role"],
       avatar: user.avatar,
-      privileges: user.privileges ? JSON.parse(user.privileges) : null,
+      privileges: parsedPrivileges,
+      permissions,
     };
   } catch (err) {
     console.error("Error fetching current user:", err);

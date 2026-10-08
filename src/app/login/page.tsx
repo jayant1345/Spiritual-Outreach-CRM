@@ -1,39 +1,57 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Sparkles, Lock, User, Shield, PhoneCall, HeartHandshake, Eye, EyeOff, CheckCircle2, ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Lock, User, Eye, EyeOff, ArrowRight, ShieldCheck, Smartphone } from "lucide-react";
 
 export default function LoginPage() {
-  const { login, switchDemoUser } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // If already authenticated, redirect to home
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push("/");
+    }
+  }, [user, authLoading, router]);
+
+  // Preload remembered username/email on this browser or PWA
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedId = localStorage.getItem("chandkheda_saved_identifier");
+      if (savedId) {
+        setIdentifier(savedId);
+      }
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!identifier.trim() || !password) {
-      setError("Please enter your username/email and password");
+    if (!identifier.trim()) {
+      setError("Please enter your username, email, or mobile number");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password. Authentication requires a password.");
       return;
     }
 
     setLoading(true);
     setError(null);
 
-    const result = await login(identifier, password);
+    const result = await login(identifier, password, rememberMe);
     if (!result.success) {
-      setError(result.error || "Invalid credentials");
+      setError(result.error || "Invalid credentials. Please verify your password.");
       setLoading(false);
     }
-  };
-
-  const handleDemoClick = async (role: string) => {
-    setLoading(true);
-    setError(null);
-    await switchDemoUser(role);
-    setLoading(false);
   };
 
   return (
@@ -79,10 +97,12 @@ export default function LoginPage() {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="bg-white/90 backdrop-blur-xl py-8 px-6 shadow-2xl shadow-[#08415C]/15 rounded-2xl border border-white/60 sm:px-10">
+        <div className="bg-white/95 backdrop-blur-xl py-8 px-6 shadow-2xl shadow-[#08415C]/15 rounded-2xl border border-white/60 sm:px-10">
           <div className="mb-6 border-b border-stone-100 pb-4">
             <h2 className="text-lg font-semibold text-stone-900">Sign in to your Sewa Account</h2>
-            <p className="text-xs text-stone-500 mt-0.5">Enter your allocated credentials to view your assigned work.</p>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Enter your assigned username/email and password to authenticate.
+            </p>
           </div>
 
           {error && (
@@ -132,6 +152,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-stone-400 hover:text-stone-600"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -139,27 +160,32 @@ export default function LoginPage() {
             </div>
 
             <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center">
+              <label className="flex items-center cursor-pointer select-none">
                 <input
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  defaultChecked
-                  className="h-4 w-4 text-[#08415C] focus:ring-[#08415C] border-stone-300 rounded"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 text-[#08415C] focus:ring-[#08415C] border-stone-300 rounded cursor-pointer"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-xs text-stone-600">
-                  Stay signed in
-                </label>
-              </div>
+                <span className="ml-2 text-xs text-stone-600 font-medium">
+                  Stay signed in (Auto-login on PWA)
+                </span>
+              </label>
 
               <div className="text-xs">
-                <a href="#demo" onClick={() => setError("Please contact Temple Admin to reset your password.")} className="font-medium text-[#08415C] hover:underline">
+                <button
+                  type="button"
+                  onClick={() => setError("Please contact your Temple Admin or Coordinator to reset your password.")}
+                  className="font-medium text-[#08415C] hover:underline"
+                >
                   Forgot password?
-                </a>
+                </button>
               </div>
             </div>
 
-            <div>
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={loading}
@@ -169,7 +195,7 @@ export default function LoginPage() {
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>Enter CRM Sewa</span>
+                    <span>Sign In With Credentials</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -177,66 +203,19 @@ export default function LoginPage() {
             </div>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-stone-100">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 text-center mb-3">
-              ✨ Quick Role Login (One-Click Evaluation)
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoClick("SUPER_ADMIN")}
-                className="flex items-center gap-2 p-2 rounded-lg bg-stone-50 hover:bg-[#08415C]/10 border border-stone-200 text-left transition-all"
-              >
-                <div className="w-7 h-7 rounded-md bg-[#08415C] text-white flex items-center justify-center text-xs">
-                  <Shield className="w-3.5 h-3.5 text-[#D4AF37]" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-stone-800">Admin</div>
-                  <div className="text-[10px] text-stone-500">Full Access</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDemoClick("COORDINATOR")}
-                className="flex items-center gap-2 p-2 rounded-lg bg-stone-50 hover:bg-emerald-50 border border-stone-200 text-left transition-all"
-              >
-                <div className="w-7 h-7 rounded-md bg-emerald-600 text-white flex items-center justify-center text-xs">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-stone-800">Coordinator</div>
-                  <div className="text-[10px] text-stone-500">Team Leader</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDemoClick("CALLING_VOLUNTEER")}
-                className="flex items-center gap-2 p-2 rounded-lg bg-stone-50 hover:bg-blue-50 border border-stone-200 text-left transition-all"
-              >
-                <div className="w-7 h-7 rounded-md bg-blue-600 text-white flex items-center justify-center text-xs">
-                  <PhoneCall className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-stone-800">Caller (Amit)</div>
-                  <div className="text-[10px] text-stone-500">Calling Desk Only</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDemoClick("RELATIONSHIP_VOLUNTEER")}
-                className="flex items-center gap-2 p-2 rounded-lg bg-stone-50 hover:bg-amber-50 border border-stone-200 text-left transition-all"
-              >
-                <div className="w-7 h-7 rounded-md bg-amber-600 text-white flex items-center justify-center text-xs">
-                  <HeartHandshake className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-stone-800">Counselor (Priya)</div>
-                  <div className="text-[10px] text-stone-500">Counselees Only</div>
-                </div>
-              </button>
+          {/* Security & PWA Persistence Notice */}
+          <div className="mt-6 pt-5 border-t border-stone-100 space-y-2">
+            <div className="flex items-start gap-2 text-[11px] text-stone-500 bg-stone-50 p-2.5 rounded-xl border border-stone-200">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <span>
+                <strong>Secure Authentication:</strong> Password entry is mandatory. Unauthorized access without authenticated credentials is strictly prevented.
+              </span>
+            </div>
+            <div className="flex items-start gap-2 text-[11px] text-stone-500 bg-amber-50/70 p-2.5 rounded-xl border border-amber-200/60">
+              <Smartphone className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+              <span>
+                <strong>PWA Mobile App:</strong> When you download or install the CRM as an app, log in with your credentials once. Your session is saved securely and will auto-login on every launch.
+              </span>
             </div>
           </div>
         </div>

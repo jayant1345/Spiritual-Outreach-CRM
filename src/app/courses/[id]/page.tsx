@@ -20,6 +20,7 @@ import {
   FileSpreadsheet,
   AlertTriangle,
   RefreshCw,
+  CalendarPlus,
 } from "lucide-react";
 
 export default function CourseAttendanceMatrixPage() {
@@ -77,6 +78,28 @@ export default function CourseAttendanceMatrixPage() {
       console.error("Error toggling attendance:", err);
     } finally {
       setMarkingSessionId(null);
+    }
+  };
+
+  const handleCreateAbsenteeFollowup = async (personId: string, name: string) => {
+    try {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      await fetch("/api/followups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          personId,
+          dueDate: tomorrow.toISOString(),
+          type: "Course Follow-up",
+          remarks: `Absent student follow-up for ${course?.title || "Course Session"}. Inquire about missed session & share recording/notes.`,
+        }),
+      });
+
+      alert(`Follow-up task created in Calling Sewa queue for ${name}!`);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -360,6 +383,13 @@ export default function CourseAttendanceMatrixPage() {
                     {/* Quick Follow-up Action */}
                     <td className="p-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleCreateAbsenteeFollowup(enr.person.id, enr.person.fullName)}
+                          className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition"
+                          title="Create Absent/Irregular Follow-up Task"
+                        >
+                          <CalendarPlus className="w-3 h-3" />
+                        </button>
                         <button
                           onClick={() => openCallModal(enr.person)}
                           className="p-1.5 bg-[#00A896] hover:bg-[#028090] text-white rounded-lg transition"

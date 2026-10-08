@@ -1,10 +1,11 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
 export async function GET(request: Request) {
   try {
-    const currentUser = await getCurrentUser();
+    const currentUser = await getCurrentUser(request);
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("query") || "";
     const area = searchParams.get("area") || "";
@@ -14,10 +15,15 @@ export async function GET(request: Request) {
 
     const where: any = {};
 
-    if (currentUser?.role === "CALLING_VOLUNTEER") {
-      where.assignedVolunteerId = currentUser.id;
-    } else if (currentUser?.role === "RELATIONSHIP_VOLUNTEER") {
-      where.relationshipVolunteerId = currentUser.id;
+    // RBAC: Check whether user can view all devotees or only their assigned contacts
+    const canViewAll = currentUser ? hasPermission(currentUser, "devotees:view_all") : false;
+
+    if (!canViewAll && currentUser) {
+      if (currentUser.role === "CALLING_VOLUNTEER") {
+        where.assignedVolunteerId = currentUser.id;
+      } else if (currentUser.role === "RELATIONSHIP_VOLUNTEER") {
+        where.relationshipVolunteerId = currentUser.id;
+      }
     } else if (volunteerId && volunteerId !== "ALL") {
       where.assignedVolunteerId = volunteerId;
     }
@@ -73,7 +79,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const currentUser = await getCurrentUser();
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser || !hasPermission(currentUser, "devotees:create")) {
+      return NextResponse.json({ error: "Unauthorized. Permission to add devotees is required." }, { status: 403 });
+    }
+
     const body = await request.json();
     const {
       fullName,

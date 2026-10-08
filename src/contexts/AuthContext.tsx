@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { PermissionKey, hasPermission as checkPermission } from "@/lib/permissions";
 
 export interface AuthUser {
   id: string;
@@ -12,22 +13,26 @@ export interface AuthUser {
   role: "SUPER_ADMIN" | "COORDINATOR" | "CALLING_VOLUNTEER" | "RELATIONSHIP_VOLUNTEER";
   avatar?: string | null;
   privileges?: string[] | null;
+  permissions?: PermissionKey[];
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (identifier: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
-  switchDemoUser: (role: string) => Promise<void>;
-  isCoordinator: boolean;
   isAdmin: boolean;
+  isCoordinator: boolean;
   isCallingVolunteer: boolean;
   isRelationshipVolunteer: boolean;
+  hasPermission: (permission: PermissionKey) => boolean;
   canAccess: (path: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const PWA_TOKEN_STORAGE_KEY = "chandkheda_pwa_auth_token";
+const PWA_USER_STORAGE_KEY = "chandkheda_pwa_auth_user";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -35,19 +40,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const fetchSession = async () => {
+  const fetchSession = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/auth/me");
+
+      // Check for saved PWA/browser auth token in localStorage
+      let storedToken: string | null = null;
+      if (typeof window !== "undefined") {
+        storedToken = localStorage.getItem(PWA_TOKEN_STORAGE_KEY);
+      }
+
+      const headers: Record<string, string> = {};
+      if (storedToken) {
+        headers["Authorization"] = `Bearer ${storedToken}`;
+      }
+
+      const res = await fetch("/api/auth/me", {
+        headers,
+        cache: "no-store",
+      });
+
       if (res.ok) {
         const data = await res.json();
         if (data.authenticated && data.user) {
           setUser(data.user);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(PWA_USER_STORAGE_KEY, JSON.stringify(data.user));
+          }
         } else {
           setUser(null);
+          if (typeof window !== "undefined") {
+            localStorage.removeItem(PWA_TOKEN_STORAGE_KEY);
+            localStorage.removeItem(PWA_USER_STORAGE_KEY);
+          }
         }
       } else {
         setUser(null);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(PWA_TOKEN_STORAGE_KEY);
+          localStorage.removeItem(PWA_USER_STORAGE_KEY);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch session:", error);
@@ -55,13 +87,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchSession();
-  }, []);
+  }, [fetchSession]);
 
-  const login = async (identifier: string, password: string) => {
+  const login = async (identifier: string, password: string, rememberMe = true) => {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -75,6 +107,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(data.user);
+
+      // Save token and credentials securely for automatic PWA & persistent browser login
+      if (typeof window !== "undefined" && data.token) {
+        localStorage.setItem(PWA_TOKEN_STORAGE_KEY, data.token);
+        localStorage.setItem(PWA_USER_STORAGE_KEY, JSON.stringify(data.user));
+        if (rememberMe) {
+          localStorage.setItem("chandkheda_saved_identifier", identifier.trim());
+        }
+      }
+
       router.push("/");
       return { success: true };
     } catch (err: any) {
@@ -85,30 +127,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      setUser(null);
-      router.push("/login");
     } catch (error) {
       console.error("Logout error:", error);
+    } finally {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(PWA_TOKEN_STORAGE_KEY);
+        localStorage.removeItem(PWA_USER_STORAGE_KEY);
+      }
+      setUser(null);
       router.push("/login");
     }
-  };
-
-  const switchDemoUser = async (role: string) => {
-    let identifier = "admin@chandkheda.org";
-    let password = "Admin@123";
-
-    if (role === "COORDINATOR") {
-      identifier = "coordinator@chandkheda.org";
-      password = "Coord@123";
-    } else if (role === "CALLING_VOLUNTEER") {
-      identifier = "amit.sewa@chandkheda.org";
-      password = "Amit@123";
-    } else if (role === "RELATIONSHIP_VOLUNTEER") {
-      identifier = "priya.sewa@chandkheda.org";
-      password = "Priya@123";
-    }
-
-    await login(identifier, password);
   };
 
   const isAdmin = user?.role === "SUPER_ADMIN";
@@ -116,22 +144,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isCallingVolunteer = user?.role === "CALLING_VOLUNTEER";
   const isRelationshipVolunteer = user?.role === "RELATIONSHIP_VOLUNTEER";
 
-  const canAccess = (path: string): boolean => {
-    if (!user) return path === "/login";
-    if (isAdmin || user.role === "COORDINATOR") return true;
+  const hasPermission = useCallback(
+    (permission: PermissionKey): boolean => {
+      return checkPermission(user, permission);
+    },
+    [user]
+  );
 
-    if (user.role === "CALLING_VOLUNTEER") {
-      const allowedPaths = ["/", "/todays-work", "/calling-sewa", "/followups", "/whatsapp"];
-      return allowedPaths.some((p) => path === p || path.startsWith(p + "/"));
-    }
+  const canAccess = useCallback(
+    (path: string): boolean => {
+      if (!user) return path === "/login";
+      if (isAdmin) return true;
 
-    if (user.role === "RELATIONSHIP_VOLUNTEER") {
-      const allowedPaths = ["/", "/todays-work", "/relationship-calling", "/courses", "/japa", "/spiritual-journey", "/followups", "/whatsapp"];
-      return allowedPaths.some((p) => path === p || path.startsWith(p + "/"));
-    }
+      // Restrict volunteers from admin areas unless granted permission
+      if (path === "/volunteers" || path.startsWith("/volunteers/")) {
+        return hasPermission("users:manage");
+      }
+      if (path === "/settings" || path.startsWith("/settings/")) {
+        return hasPermission("settings:manage");
+      }
+      if (path === "/reports" || path.startsWith("/reports/")) {
+        return hasPermission("reports:view");
+      }
 
-    return true;
-  };
+      if (user.role === "CALLING_VOLUNTEER") {
+        const allowedPaths = ["/", "/todays-work", "/calling-sewa", "/followups", "/whatsapp"];
+        return allowedPaths.some((p) => path === p || path.startsWith(p + "/"));
+      }
+
+      if (user.role === "RELATIONSHIP_VOLUNTEER") {
+        const allowedPaths = [
+          "/",
+          "/todays-work",
+          "/relationship-calling",
+          "/courses",
+          "/attendance",
+          "/japa",
+          "/spiritual-journey",
+          "/followups",
+          "/whatsapp",
+        ];
+        return allowedPaths.some((p) => path === p || path.startsWith(p + "/"));
+      }
+
+      return true;
+    },
+    [user, isAdmin, hasPermission]
+  );
 
   return (
     <AuthContext.Provider
@@ -140,11 +199,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         login,
         logout,
-        switchDemoUser,
         isAdmin,
         isCoordinator,
         isCallingVolunteer,
         isRelationshipVolunteer,
+        hasPermission,
         canAccess,
       }}
     >

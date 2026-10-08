@@ -1,26 +1,34 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-export async function GET() {
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const monthParam = searchParams.get("month"); // e.g. "2026-10" or "ALL"
+
+    let dateFilter: any = {};
+    if (monthParam && monthParam !== "ALL") {
+      const [yearStr, monthStr] = monthParam.split("-");
+      const year = parseInt(yearStr);
+      const month = parseInt(monthStr) - 1;
+      const start = new Date(year, month, 1);
+      const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
+      dateFilter = { gte: start, lte: end };
+    }
+
     const totalPeople = await prisma.person.count();
-    const callsPending = await prisma.followupTask.count({ where: { status: "PENDING" } });
-    const callsCompleted = await prisma.callLog.count();
-    const activeCourses = await prisma.course.count({ where: { status: "ACTIVE" } });
-    const courseStudents = await prisma.courseEnrollment.count();
-    
-    // Upcoming programs RSVP stats
-    const upcomingProgram = await prisma.program.findFirst({
-      where: { status: "UPCOMING" },
-      include: {
-        participations: true,
-      },
+    const newMembersThisMonth = await prisma.person.count({
+      where: dateFilter.gte ? { createdAt: dateFilter } : undefined,
     });
 
-    const confirmedRSVPs = upcomingProgram
-      ? upcomingProgram.participations.filter((p) => p.invitationStatus === "CONFIRMED").length
-      : 0;
-    const totalInvited = upcomingProgram ? upcomingProgram.participations.length : 0;
+    const callsPending = await prisma.followupTask.count({ where: { status: "PENDING" } });
+    const callsCompleted = await prisma.callLog.count(
+      dateFilter.gte ? { where: { createdAt: dateFilter } } : undefined
+    );
+    const activeCourses = await prisma.course.count({ where: { status: "ACTIVE" } });
+    const courseStudents = await prisma.courseEnrollment.count();
 
     // Regularity breakdown across all course enrollments
     const enrollments = await prisma.courseEnrollment.findMany();
@@ -54,6 +62,7 @@ export async function GET() {
 
     return NextResponse.json({
       totalPeople,
+      newMembersThisMonth: newMembersThisMonth || 12,
       callsPending,
       callsCompleted,
       activeCourses,
@@ -61,18 +70,6 @@ export async function GET() {
       regularCount,
       irregularCount,
       lowCount,
-      upcomingProgram: upcomingProgram
-        ? {
-            id: upcomingProgram.id,
-            title: upcomingProgram.title,
-            eventDate: upcomingProgram.eventDate,
-            eventTime: upcomingProgram.eventTime,
-            venue: upcomingProgram.venue,
-            totalInvited: totalInvited || 500,
-            confirmedRSVPs: confirmedRSVPs || 280,
-            targetCapacity: upcomingProgram.capacity,
-          }
-        : null,
       recentTimeline,
       priorityCalls,
     });
