@@ -55,7 +55,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-[#FAF8F5] flex flex-col justify-center py-6 sm:py-12 px-3.5 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Sacred Sri Sri Radha Govind Ahmedabad Glass Backdrop */}
       <div
         className="fixed inset-0 pointer-events-none z-0"
@@ -96,8 +96,8 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="bg-white/95 backdrop-blur-xl py-8 px-6 shadow-2xl shadow-[#08415C]/15 rounded-2xl border border-white/60 sm:px-10">
+      <div className="mt-6 sm:mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <div className="bg-white/95 backdrop-blur-xl py-6 px-4 sm:py-8 sm:px-10 shadow-2xl shadow-[#08415C]/15 rounded-2xl border border-white/60">
           <div className="mb-6 border-b border-stone-100 pb-4">
             <h2 className="text-lg font-semibold text-stone-900">Sign in to your Sewa Account</h2>
             <p className="text-xs text-stone-500 mt-0.5">

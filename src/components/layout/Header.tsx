@@ -197,55 +197,58 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Live Search Results Dropdown */}
         {isSearchOpen && (
-          <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-xl border border-stone-200 py-2 z-50 max-h-96 overflow-y-auto animate-fadeIn">
-            <div className="px-3.5 py-1.5 border-b border-stone-100 flex items-center justify-between text-[11px] text-stone-500 font-semibold">
-              <span>{isSearching ? "Searching..." : `Found ${searchResults.length} members`}</span>
-              <button
-                onClick={() => {
-                  setIsSearchOpen(false);
-                  router.push(`/people?query=${encodeURIComponent(query.trim())}`);
-                }}
-                className="text-[#08415C] hover:underline flex items-center gap-1 font-bold"
-              >
-                <span>View all in Directory</span>
-                <ExternalLink className="w-3 h-3" />
-              </button>
-            </div>
-
-            {searchResults.length === 0 && !isSearching && (
-              <div className="p-4 text-center text-xs text-stone-500">
-                No matching members found for "{query}".
+          <>
+            <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setIsSearchOpen(false)} />
+            <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-0 sm:top-full sm:mt-1.5 bg-white rounded-2xl shadow-xl border border-stone-200 py-2 z-50 max-h-96 overflow-y-auto animate-fadeIn">
+              <div className="px-3.5 py-1.5 border-b border-stone-100 flex items-center justify-between text-[11px] text-stone-500 font-semibold">
+                <span>{isSearching ? "Searching..." : `Found ${searchResults.length} members`}</span>
+                <button
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    router.push(`/people?query=${encodeURIComponent(query.trim())}`);
+                  }}
+                  className="text-[#08415C] hover:underline flex items-center gap-1 font-bold"
+                >
+                  <span>View all in Directory</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
               </div>
-            )}
 
-            {searchResults.map((member) => (
-              <button
-                key={member.id}
-                onClick={() => {
-                  setIsSearchOpen(false);
-                  openPersonModal(member.id);
-                }}
-                className="w-full px-3.5 py-2.5 text-left hover:bg-stone-50 flex items-center justify-between gap-3 transition border-b border-stone-50 last:border-none"
-              >
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-[#08415C] truncate flex items-center gap-2">
-                    <span>{member.fullName}</span>
-                    <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-stone-100 text-stone-600 border border-stone-200">
-                      {member.stage || "Member"}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-stone-500 flex items-center gap-2 mt-0.5">
-                    <span className="font-mono">{member.mobile}</span>
-                    {member.area && <span>• {member.area}</span>}
-                    {member.profession && <span>• {member.profession}</span>}
-                  </div>
+              {searchResults.length === 0 && !isSearching && (
+                <div className="p-4 text-center text-xs text-stone-500">
+                  No matching members found for "{query}".
                 </div>
-                <div className="text-[11px] text-[#08415C] font-semibold flex items-center gap-1 flex-shrink-0">
-                  <span>360° Profile</span>
-                </div>
-              </button>
-            ))}
-          </div>
+              )}
+
+              {searchResults.map((member) => (
+                <button
+                  key={member.id}
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    openPersonModal(member.id);
+                  }}
+                  className="w-full px-3.5 py-2.5 text-left hover:bg-stone-50 flex items-center justify-between gap-3 transition border-b border-stone-50 last:border-none"
+                >
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[#08415C] truncate flex items-center gap-2">
+                      <span>{member.fullName}</span>
+                      <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-stone-100 text-stone-600 border border-stone-200">
+                        {member.stage || "Member"}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-stone-500 flex items-center gap-2 mt-0.5">
+                      <span className="font-mono">{member.mobile}</span>
+                      {member.area && <span>• {member.area}</span>}
+                      {member.profession && <span>• {member.profession}</span>}
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-[#08415C] font-semibold flex items-center gap-1 flex-shrink-0">
+                    <span>360° Profile</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -275,7 +278,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Notification Dropdown */}
           {isNotifOpen && (
-            <div className="absolute right-0 mt-2 w-[calc(100vw-24px)] sm:w-96 max-w-sm bg-white rounded-2xl shadow-2xl border border-stone-200 py-2.5 z-50 animate-fadeIn">
+            <>
+              <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setIsNotifOpen(false)} />
+              <div className="fixed inset-x-3 top-16 sm:absolute sm:top-full sm:right-0 sm:left-auto sm:w-96 sm:mt-2 max-w-sm mx-auto bg-white rounded-2xl shadow-2xl border border-stone-200 py-2.5 z-50 animate-fadeIn">
               <div className="px-4 py-2 border-b border-stone-100 flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
@@ -405,46 +410,49 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Rename: + Add New Members (Previously + Add Seeker) */}
-        {onOpenAddPerson && (
-          <button
-            onClick={onOpenAddPerson}
-            className="p-2 sm:px-3.5 sm:py-2 bg-[#08415C] hover:bg-[#063349] text-white text-xs font-semibold rounded-xl border border-[#D4AF37]/50 shadow-gold flex items-center gap-1.5 transition flex-shrink-0"
-            title="Add New Member"
-          >
-            <Plus className="w-4 h-4 text-[#D4AF37]" />
-            <span className="hidden sm:inline">+ Add Member</span>
-          </button>
+          </>
         )}
+      </div>
 
-        {/* Profile Dropdown */}
-        <div className="relative flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:px-2.5 sm:py-1.5 bg-white border border-[#E5D8B8] rounded-xl hover:border-[#08415C] transition shadow-xs"
-          >
-            <div className="w-7 h-7 rounded-lg bg-[#08415C] text-white flex items-center justify-center border border-[#D4AF37]">
-              <User className="w-3.5 h-3.5 text-[#D4AF37]" />
-            </div>
-            <div className="hidden sm:flex flex-col text-left">
-              <div className="text-xs font-bold text-[#0B192C] leading-none">{user?.name || "Guest"}</div>
-              <div className="mt-0.5 flex items-center gap-1">
-                <span
-                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${badge.bg} ${badge.text} ${badge.border}`}
-                >
-                  {badge.label}
-                </span>
-              </div>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
-          </button>
+      {/* Rename: + Add New Members (Previously + Add Seeker) */}
+      {onOpenAddPerson && (
+        <button
+          onClick={onOpenAddPerson}
+          className="p-2 sm:px-3.5 sm:py-2 bg-[#08415C] hover:bg-[#063349] text-white text-xs font-semibold rounded-xl border border-[#D4AF37]/50 shadow-gold flex items-center gap-1.5 transition flex-shrink-0"
+          title="Add New Member"
+        >
+          <Plus className="w-4 h-4 text-[#D4AF37]" />
+          <span className="hidden sm:inline">+ Add Member</span>
+        </button>
+      )}
 
-          {isProfileOpen && (
-            <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-stone-200 py-2 z-50 animate-fadeIn">
+      {/* Profile Dropdown */}
+      <div className="relative flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => setIsProfileOpen(!isProfileOpen)}
+          className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:px-2.5 sm:py-1.5 bg-white border border-[#E5D8B8] rounded-xl hover:border-[#08415C] transition shadow-xs"
+        >
+          <div className="w-7 h-7 rounded-lg bg-[#08415C] text-white flex items-center justify-center border border-[#D4AF37]">
+            <User className="w-3.5 h-3.5 text-[#D4AF37]" />
+          </div>
+          <div className="hidden sm:flex flex-col text-left">
+            <div className="text-xs font-bold text-[#0B192C] leading-none">{user?.name || "Guest"}</div>
+            <div className="mt-0.5 flex items-center gap-1">
+              <span
+                className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${badge.bg} ${badge.text} ${badge.border}`}
+              >
+                {badge.label}
+              </span>
+            </div>
+          </div>
+          <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+        </button>
+
+        {isProfileOpen && (
+          <>
+            <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setIsProfileOpen(false)} />
+            <div className="fixed right-3 top-16 sm:absolute sm:right-0 sm:top-full sm:mt-2 w-64 max-w-[calc(100vw-24px)] bg-white rounded-2xl shadow-xl border border-stone-200 py-2 z-50 animate-fadeIn">
               <div className="px-4 py-2.5 border-b border-stone-100">
                 <div className="text-xs font-bold text-stone-900">{user?.name}</div>
                 <div className="text-[11px] text-stone-500 truncate">{user?.email}</div>
@@ -471,8 +479,9 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             </div>
-          )}
-        </div>
+          </>
+        )}
+      </div>
       </div>
     </header>
   );

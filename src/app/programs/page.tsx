@@ -97,7 +97,7 @@ export default function ProgramsPage() {
                   <span>Target: {prog.capacity} Devotees</span>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2 text-center text-xs pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs pt-1">
                   <div className="p-2 bg-white rounded border border-[#E5D8B8]">
                     <div className="font-bold text-[#08415C] text-sm">{stats.invitedCount}</div>
                     <div className="text-[10px] text-[#78909C]">Invited</div>
