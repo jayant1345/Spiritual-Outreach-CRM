@@ -3,6 +3,18 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 
+function parseUtcDate(dateStr?: string | Date): Date {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
+  const str = String(dateStr).split("T")[0];
+  const parts = str.split("-").map(Number);
+  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+    return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12, 0, 0));
+  }
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? new Date() : d;
+}
+
 export async function POST(request: Request) {
   try {
     const currentUser = await getCurrentUser(request);
@@ -17,41 +29,74 @@ export async function POST(request: Request) {
       startDate,
       scheduleInfo,
       venue,
-      maxCapacity,
       totalSessions,
+      sessions,
     } = body;
 
     if (!courseId || !batchName) {
       return NextResponse.json({ error: "Course ID and Batch Name are required" }, { status: 400 });
     }
 
+    const parsedStartDate = parseUtcDate(startDate);
+
     const batch = await prisma.courseBatch.create({
       data: {
         courseId,
-        batchName,
-        startDate: startDate ? new Date(startDate) : new Date(),
-        scheduleInfo: scheduleInfo || "Weekly Session",
+        batchName: batchName.trim(),
+        startDate: parsedStartDate,
+        scheduleInfo: scheduleInfo ? scheduleInfo.trim() : "Weekly Session",
       },
     });
 
-    const sessionsCount = Number(totalSessions) || 8;
-    const sDate = startDate ? new Date(startDate) : new Date();
+    // If custom sessions were provided from modal customization
+    if (Array.isArray(sessions) && sessions.length > 0) {
+      for (let i = 0; i < sessions.length; i++) {
+        const s = sessions[i];
+        const sDate = s.sessionDate ? parseUtcDate(s.sessionDate) : new Date(parsedStartDate.getTime() + i * 7 * 24 * 60 * 60 * 1000);
+        await prisma.courseSession.create({
+          data: {
+            batchId: batch.id,
+            sessionNumber: Number(s.sessionNumber) || i + 1,
+            title: s.title ? s.title.trim() : `Session ${i + 1}`,
+            sessionDate: sDate,
+            sessionTime: s.sessionTime ? s.sessionTime.trim() : (scheduleInfo || "Evening"),
+            completed: false,
+          },
+        });
+      }
+    } else {
+      const sessionsCount = Number(totalSessions) || 8;
+      const [y, m, d] = (startDate ? String(startDate).split("T")[0] : "").split("-").map(Number);
 
-    for (let i = 1; i <= sessionsCount; i++) {
-      const sessionDate = new Date(sDate.getTime() + (i - 1) * 7 * 24 * 60 * 60 * 1000);
-      await prisma.courseSession.create({
-        data: {
-          batchId: batch.id,
-          sessionNumber: i,
-          title: `Session ${i}`,
-          sessionDate,
-          sessionTime: scheduleInfo || "Evening",
-          completed: false,
-        },
-      });
+      for (let i = 1; i <= sessionsCount; i++) {
+        let sessionDate: Date;
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+          dt.setUTCDate(dt.getUTCDate() + (i - 1) * 7);
+          sessionDate = dt;
+        } else {
+          sessionDate = new Date(parsedStartDate.getTime() + (i - 1) * 7 * 24 * 60 * 60 * 1000);
+        }
+
+        await prisma.courseSession.create({
+          data: {
+            batchId: batch.id,
+            sessionNumber: i,
+            title: `Session ${i}`,
+            sessionDate,
+            sessionTime: scheduleInfo || "Evening",
+            completed: false,
+          },
+        });
+      }
     }
 
-    return NextResponse.json({ success: true, batch }, { status: 201 });
+    const createdBatch = await prisma.courseBatch.findUnique({
+      where: { id: batch.id },
+      include: { sessions: { orderBy: { sessionNumber: "asc" } } },
+    });
+
+    return NextResponse.json({ success: true, batch: createdBatch }, { status: 201 });
   } catch (error: any) {
     console.error("Batch creation error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -72,49 +117,91 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Batch ID is required" }, { status: 400 });
     }
 
-    const updated = await prisma.courseBatch.update({
+    const parsedStartDate = startDate ? parseUtcDate(startDate) : undefined;
+
+    await prisma.courseBatch.update({
       where: { id },
       data: {
         ...(batchName ? { batchName: batchName.trim() } : {}),
         ...(scheduleInfo !== undefined ? { scheduleInfo: scheduleInfo.trim() } : {}),
-        ...(startDate ? { startDate: new Date(startDate) } : {}),
+        ...(parsedStartDate ? { startDate: parsedStartDate } : {}),
         ...(active !== undefined ? { active: Boolean(active) } : {}),
       },
     });
 
-    // Handle individual session overrides if provided
-    if (Array.isArray(sessions) && sessions.length > 0) {
-      for (const s of sessions) {
-        if (s.id) {
+    // Handle individual session overrides / customization if provided
+    if (Array.isArray(sessions)) {
+      const existingSessions = await prisma.courseSession.findMany({
+        where: { batchId: id },
+      });
+      const incomingIds = new Set(sessions.filter((s) => s.id).map((s) => s.id));
+
+      // 1. Delete sessions removed by user in customization
+      for (const ex of existingSessions) {
+        if (!incomingIds.has(ex.id)) {
+          await prisma.courseSession.delete({
+            where: { id: ex.id },
+          });
+        }
+      }
+
+      // 2. Update existing or insert new sessions
+      for (let i = 0; i < sessions.length; i++) {
+        const s = sessions[i];
+        const sDate = s.sessionDate ? parseUtcDate(s.sessionDate) : undefined;
+
+        if (s.id && existingSessions.some((ex) => ex.id === s.id)) {
           await prisma.courseSession.update({
             where: { id: s.id },
             data: {
-              ...(s.sessionDate ? { sessionDate: new Date(s.sessionDate) } : {}),
-              ...(s.sessionTime !== undefined ? { sessionTime: s.sessionTime } : {}),
-              ...(s.title !== undefined ? { title: s.title } : {}),
+              sessionNumber: Number(s.sessionNumber) || i + 1,
+              ...(sDate ? { sessionDate: sDate } : {}),
+              ...(s.sessionTime !== undefined ? { sessionTime: s.sessionTime.trim() } : {}),
+              ...(s.title !== undefined ? { title: s.title.trim() } : {}),
               ...(s.completed !== undefined ? { completed: Boolean(s.completed) } : {}),
+            },
+          });
+        } else {
+          // New session added by user
+          await prisma.courseSession.create({
+            data: {
+              batchId: id,
+              sessionNumber: Number(s.sessionNumber) || i + 1,
+              title: s.title ? s.title.trim() : `Session ${i + 1}`,
+              sessionDate: sDate || new Date(),
+              sessionTime: s.sessionTime ? s.sessionTime.trim() : (scheduleInfo || "Evening"),
+              completed: Boolean(s.completed),
             },
           });
         }
       }
     } else if (startDate && syncSessionDates) {
       // Automatically recalculate all session dates based on the new batch startDate (+7 days weekly)
-      const parsedStartDate = new Date(startDate);
       const existingSessions = await prisma.courseSession.findMany({
         where: { batchId: id },
         orderBy: { sessionNumber: "asc" },
       });
 
-      for (const sess of existingSessions) {
-        // Session 1 is on startDate, Session 2 is startDate + 7 days, Session 3 is startDate + 14 days, etc.
-        const newSessionDate = new Date(
-          parsedStartDate.getTime() + (sess.sessionNumber - 1) * 7 * 24 * 60 * 60 * 1000
-        );
+      const [y, m, d] = String(startDate).split("T")[0].split("-").map(Number);
+
+      for (let idx = 0; idx < existingSessions.length; idx++) {
+        const sess = existingSessions[idx];
+        let newSessionDate: Date;
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+          dt.setUTCDate(dt.getUTCDate() + (sess.sessionNumber - 1) * 7);
+          newSessionDate = dt;
+        } else {
+          newSessionDate = new Date(
+            (parsedStartDate || new Date()).getTime() + (sess.sessionNumber - 1) * 7 * 24 * 60 * 60 * 1000
+          );
+        }
+
         await prisma.courseSession.update({
           where: { id: sess.id },
           data: {
             sessionDate: newSessionDate,
-            ...(scheduleInfo ? { sessionTime: scheduleInfo } : {}),
+            ...(scheduleInfo ? { sessionTime: scheduleInfo.trim() } : {}),
           },
         });
       }

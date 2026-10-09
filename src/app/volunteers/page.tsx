@@ -15,6 +15,7 @@ export default function VolunteersPage() {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [selectedUserForPassword, setSelectedUserForPassword] = useState<any>(null);
   const [newPassword, setNewPassword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "ALL" | "INACTIVE">("ACTIVE");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -30,12 +31,12 @@ export default function VolunteersPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/auth/users");
+      const res = await fetch("/api/auth/users?includeInactive=true");
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) setVolunteers(data);
       } else {
-        const fbRes = await fetch("/api/volunteers");
+        const fbRes = await fetch("/api/volunteers?includeInactive=true");
         const fbData = await fbRes.json();
         if (Array.isArray(fbData)) setVolunteers(fbData);
       }
@@ -85,13 +86,14 @@ export default function VolunteersPage() {
   };
 
   const handleToggleActive = async (user: any) => {
-    if (!confirm(`Are you sure you want to ${user.active ? "deactivate" : "activate"} ${user.name}?`)) return;
+    const isCurrentlyActive = Boolean(user.active);
+    if (!confirm(`Are you sure you want to ${isCurrentlyActive ? "deactivate" : "activate"} ${user.name}?`)) return;
 
     try {
       await fetch("/api/auth/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: user.id, active: !user.active }),
+        body: JSON.stringify({ id: user.id, active: !isCurrentlyActive }),
       });
       fetchUsers();
     } catch (err) {
@@ -172,8 +174,75 @@ export default function VolunteersPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {volunteers.map((vol) => (
+      {/* Filter Tabs */}
+      {(() => {
+        const activeCount = volunteers.filter((v) => Boolean(v.active)).length;
+        const inactiveCount = volunteers.filter((v) => !Boolean(v.active)).length;
+        const filteredVolunteers = volunteers.filter((v) => {
+          if (statusFilter === "ACTIVE") return Boolean(v.active);
+          if (statusFilter === "INACTIVE") return !Boolean(v.active);
+          return true;
+        });
+
+        return (
+          <>
+            <div className="flex items-center gap-2 border-b border-[#E5D8B8]/60 pb-3 flex-wrap">
+              <span className="text-xs font-bold text-stone-500 mr-1">Filter Users:</span>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("ACTIVE")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                  statusFilter === "ACTIVE"
+                    ? "bg-[#08415C] text-white shadow-xs"
+                    : "bg-white border border-stone-200 text-stone-700 hover:bg-stone-50"
+                }`}
+              >
+                <span>🟢 Active Users Only</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${statusFilter === "ACTIVE" ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"}`}>
+                  {activeCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatusFilter("ALL")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                  statusFilter === "ALL"
+                    ? "bg-[#08415C] text-white shadow-xs"
+                    : "bg-white border border-stone-200 text-stone-700 hover:bg-stone-50"
+                }`}
+              >
+                <span>All Users</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${statusFilter === "ALL" ? "bg-white/20 text-white" : "bg-stone-100 text-stone-700"}`}>
+                  {volunteers.length}
+                </span>
+              </button>
+
+              {inactiveCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("INACTIVE")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                    statusFilter === "INACTIVE"
+                      ? "bg-rose-700 text-white shadow-xs"
+                      : "bg-white border border-rose-200 text-rose-700 hover:bg-rose-50"
+                  }`}
+                >
+                  <span>Deactivated Users</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${statusFilter === "INACTIVE" ? "bg-white/20 text-white" : "bg-rose-100 text-rose-800"}`}>
+                    {inactiveCount}
+                  </span>
+                </button>
+              )}
+            </div>
+
+            {filteredVolunteers.length === 0 ? (
+              <div className="p-8 gold-card text-center text-xs text-stone-500">
+                No users found matching {statusFilter.toLowerCase()} status.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredVolunteers.map((vol) => (
           <div key={vol.id} className="gold-card p-5 space-y-4 relative flex flex-col justify-between">
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -280,6 +349,10 @@ export default function VolunteersPage() {
           </div>
         ))}
       </div>
+    )}
+  </>
+);
+})()}
 
       <Modal
         isOpen={isAddUserOpen}

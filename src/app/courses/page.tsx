@@ -6,6 +6,7 @@ import Badge from "@/components/common/Badge";
 import Modal from "@/components/common/Modal";
 import BatchBulkImportModal from "@/components/courses/BatchBulkImportModal";
 import EditBatchModal from "@/components/courses/EditBatchModal";
+import EditCourseModal from "@/components/courses/EditCourseModal";
 import {
   GraduationCap,
   Plus,
@@ -23,8 +24,78 @@ import {
   PhoneCall,
   Edit2,
   Trash2,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+
+const WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+function getWeekdayIndex(dayName: string): number {
+  return WEEKDAYS.findIndex((d) => d.toLowerCase() === dayName.toLowerCase());
+}
+
+function getNextDateForWeekday(targetDayName: string, baseDateStr?: string): string {
+  const targetIdx = getWeekdayIndex(targetDayName);
+  if (targetIdx === -1) return baseDateStr || "";
+
+  let base = new Date();
+  if (baseDateStr) {
+    const [y, m, d] = baseDateStr.split("-").map(Number);
+    base = new Date(y, m - 1, d, 12, 0, 0);
+  }
+
+  const currentIdx = base.getDay();
+  let diff = targetIdx - currentIdx;
+  if (diff < 0) diff += 7;
+
+  const res = new Date(base.getTime());
+  res.setDate(res.getDate() + diff);
+  const year = res.getFullYear();
+  const month = String(res.getMonth() + 1).padStart(2, "0");
+  const day = String(res.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getDayOfWeekFromDateString(dateStr: string): string {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d, 12, 0, 0);
+  return WEEKDAYS[date.getDay()];
+}
+
+function formatDisplayDate(dateStr: string): string {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d, 12, 0, 0);
+  return date.toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function addWeeksToDateString(baseDateStr: string, weeks: number): string {
+  if (!baseDateStr) return "";
+  const [y, m, d] = baseDateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d, 12, 0, 0);
+  date.setDate(date.getDate() + weeks * 7);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 export default function CoursesPage() {
   const { hasPermission } = useAuth();
@@ -40,6 +111,8 @@ export default function CoursesPage() {
   const [bulkBatch, setBulkBatch] = useState<any>(null);
   const [isEditBatchOpen, setIsEditBatchOpen] = useState(false);
   const [batchToEdit, setBatchToEdit] = useState<any>(null);
+  const [isEditCourseOpen, setIsEditCourseOpen] = useState(false);
+  const [courseToEdit, setCourseToEdit] = useState<any>(null);
 
   const [selectedCourseForBatch, setSelectedCourseForBatch] = useState<string>("");
   const [selectedBatchForEnroll, setSelectedBatchForEnroll] = useState<string>("");
@@ -54,11 +127,29 @@ export default function CoursesPage() {
     startDate: new Date().toISOString().split("T")[0],
   });
 
-  const [batchForm, setBatchForm] = useState({
+  const [batchForm, setBatchForm] = useState<{
+    batchName: string;
+    selectedWeekday: string;
+    scheduleTime: string;
+    startDate: string;
+    scheduleInfo: string;
+    totalSessions: number;
+    customSessions: Array<{
+      sessionNumber: number;
+      title: string;
+      sessionDate: string;
+      sessionTime: string;
+    }>;
+    showCustomSessions: boolean;
+  }>({
     batchName: "",
-    startDate: new Date().toISOString().split("T")[0],
-    scheduleInfo: "Every Sunday 5:00 PM",
+    selectedWeekday: "Saturday",
+    scheduleTime: "6:30 PM",
+    startDate: getNextDateForWeekday("Saturday"),
+    scheduleInfo: "Every Saturday 6:30 PM",
     totalSessions: 8,
+    customSessions: [],
+    showCustomSessions: false,
   });
 
   const [selectedMemberId, setSelectedMemberId] = useState("");
@@ -120,6 +211,120 @@ export default function CoursesPage() {
     }
   };
 
+  const handleOpenAddBatch = (courseId: string) => {
+    setSelectedCourseForBatch(courseId);
+    const initialDay = "Saturday";
+    const initialStartDate = getNextDateForWeekday(initialDay);
+    const initialTime = "6:30 PM";
+    const initialSchedule = `Every ${initialDay} ${initialTime}`;
+    const total = 8;
+
+    const initialSessions = Array.from({ length: total }, (_, i) => ({
+      sessionNumber: i + 1,
+      title: `Session ${i + 1}`,
+      sessionDate: addWeeksToDateString(initialStartDate, i),
+      sessionTime: initialSchedule,
+    }));
+
+    setBatchForm({
+      batchName: `Batch (${initialDay} Class)`,
+      selectedWeekday: initialDay,
+      scheduleTime: initialTime,
+      startDate: initialStartDate,
+      scheduleInfo: initialSchedule,
+      totalSessions: total,
+      customSessions: initialSessions,
+      showCustomSessions: false,
+    });
+    setIsAddBatchOpen(true);
+  };
+
+  const handleBatchWeekdayChange = (day: string) => {
+    const updatedSchedule = `Every ${day} ${batchForm.scheduleTime}`;
+    const snapped = getNextDateForWeekday(day, batchForm.startDate || undefined);
+    const updatedSessions = Array.from({ length: batchForm.totalSessions }, (_, i) => ({
+      sessionNumber: i + 1,
+      title: `Session ${i + 1}`,
+      sessionDate: addWeeksToDateString(snapped, i),
+      sessionTime: updatedSchedule,
+    }));
+
+    setBatchForm((prev) => ({
+      ...prev,
+      selectedWeekday: day,
+      scheduleInfo: updatedSchedule,
+      startDate: snapped,
+      customSessions: updatedSessions,
+    }));
+  };
+
+  const handleBatchTimeChange = (time: string) => {
+    const updatedSchedule = `Every ${batchForm.selectedWeekday} ${time}`;
+    setBatchForm((prev) => ({
+      ...prev,
+      scheduleTime: time,
+      scheduleInfo: updatedSchedule,
+      customSessions: prev.customSessions.map((s) => ({ ...s, sessionTime: updatedSchedule })),
+    }));
+  };
+
+  const handleBatchStartDateChange = (dateVal: string) => {
+    const detectedDay = dateVal ? getDayOfWeekFromDateString(dateVal) : batchForm.selectedWeekday;
+    const updatedSchedule = `Every ${detectedDay || batchForm.selectedWeekday} ${batchForm.scheduleTime}`;
+    const updatedSessions = Array.from({ length: batchForm.totalSessions }, (_, i) => ({
+      sessionNumber: i + 1,
+      title: `Session ${i + 1}`,
+      sessionDate: addWeeksToDateString(dateVal, i),
+      sessionTime: updatedSchedule,
+    }));
+
+    setBatchForm((prev) => ({
+      ...prev,
+      startDate: dateVal,
+      selectedWeekday: detectedDay || prev.selectedWeekday,
+      scheduleInfo: updatedSchedule,
+      customSessions: updatedSessions,
+    }));
+  };
+
+  const handleBatchTotalSessionsChange = (num: number) => {
+    const count = Math.max(1, Math.min(50, num));
+    const updatedSessions = Array.from({ length: count }, (_, i) => {
+      const existing = batchForm.customSessions[i];
+      return existing || {
+        sessionNumber: i + 1,
+        title: `Session ${i + 1}`,
+        sessionDate: addWeeksToDateString(batchForm.startDate, i),
+        sessionTime: batchForm.scheduleInfo,
+      };
+    });
+
+    setBatchForm((prev) => ({
+      ...prev,
+      totalSessions: count,
+      customSessions: updatedSessions,
+    }));
+  };
+
+  const handleSnapBatchWeekday = (targetDay: string) => {
+    const snapped = getNextDateForWeekday(targetDay, batchForm.startDate || undefined);
+    const updatedSchedule = `Every ${targetDay} ${batchForm.scheduleTime}`;
+    const updatedSessions = Array.from({ length: batchForm.totalSessions }, (_, i) => ({
+      sessionNumber: i + 1,
+      title: `Session ${i + 1}`,
+      sessionDate: addWeeksToDateString(snapped, i),
+      sessionTime: updatedSchedule,
+    }));
+
+    setBatchForm((prev) => ({
+      ...prev,
+      selectedWeekday: targetDay,
+      startDate: snapped,
+      scheduleInfo: updatedSchedule,
+      customSessions: updatedSessions,
+    }));
+  };
+
   const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCourseForBatch) return;
@@ -129,22 +334,27 @@ export default function CoursesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...batchForm,
           courseId: selectedCourseForBatch,
+          batchName: batchForm.batchName.trim(),
+          startDate: batchForm.startDate,
+          scheduleInfo: batchForm.scheduleInfo.trim(),
+          totalSessions: batchForm.totalSessions,
+          sessions:
+            batchForm.showCustomSessions && batchForm.customSessions.length > 0
+              ? batchForm.customSessions
+              : undefined,
         }),
       });
       if (res.ok) {
         setIsAddBatchOpen(false);
-        setBatchForm({
-          batchName: "",
-          startDate: new Date().toISOString().split("T")[0],
-          scheduleInfo: "Every Sunday 5:00 PM",
-          totalSessions: 8,
-        });
         fetchCourses();
+      } else {
+        const d = await res.json();
+        alert(d.error || "Failed to create batch");
       }
     } catch (err) {
       console.error(err);
+      alert("Error creating batch");
     } finally {
       setSubmitting(false);
     }
@@ -179,11 +389,10 @@ export default function CoursesPage() {
   };
 
   const handleDeleteBatch = async (batchId: string, batchName: string) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete batch "${batchName}"?\nAll sessions and enrollments in this batch will be permanently removed.`
-      )
-    ) {
+    const confirmation = prompt(
+      `⚠️ WARNING: Deleting batch "${batchName}" will permanently remove all associated sessions, enrollments, and attendance records.\n\nType "DELETE" to confirm:`
+    );
+    if (confirmation !== "DELETE") {
       return;
     }
     try {
@@ -198,6 +407,35 @@ export default function CoursesPage() {
       }
     } catch (err) {
       console.error("Delete batch error:", err);
+      alert("Error deleting batch");
+    }
+  };
+
+  const handleOpenEditCourse = (course: any) => {
+    setCourseToEdit(course);
+    setIsEditCourseOpen(true);
+  };
+
+  const handleDeleteCourse = async (courseId: string, courseTitle: string) => {
+    const confirmation = prompt(
+      `⚠️ WARNING: Deleting course "${courseTitle}" will permanently delete this course and all associated batches, sessions, enrollments, and attendance records.\n\nType "DELETE" to confirm:`
+    );
+    if (confirmation !== "DELETE") {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/courses?id=${courseId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        fetchCourses();
+      } else {
+        const d = await res.json();
+        alert(d.error || "Failed to delete course");
+      }
+    } catch (err) {
+      console.error("Delete course error:", err);
+      alert("Error deleting course");
     }
   };
 
@@ -240,13 +478,46 @@ export default function CoursesPage() {
 
           return (
             <div key={course.id} className="gold-card p-4 sm:p-5 space-y-4 shadow-xs">
-              <div className="flex items-center justify-between">
-                <Badge variant={course.status === "ACTIVE" ? "emerald" : "neutral"} size="sm">
-                  {course.status}
-                </Badge>
-                <span className="text-xs font-semibold text-[#B8860B]">
-                  {course.totalSessions} Total Sessions
-                </span>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant={course.status === "ACTIVE" ? "emerald" : "neutral"} size="sm">
+                    {course.status}
+                  </Badge>
+                  {course.courseType && (
+                    <span className="text-[11px] font-semibold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-md">
+                      {course.courseType}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-[#B8860B] mr-1 hidden sm:inline">
+                    {course.totalSessions} Sessions
+                  </span>
+
+                  {hasPermission("courses:manage") && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditCourse(course)}
+                        className="px-2.5 py-1 text-xs font-bold text-[#08415C] hover:bg-[#08415C]/10 border border-stone-200 rounded-lg flex items-center gap-1 transition shadow-xs"
+                        title="Edit / Customize this course"
+                      >
+                        <Edit2 className="w-3.5 h-3.5 text-[#D4AF37]" />
+                        <span>Edit Course</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCourse(course.id, course.title)}
+                        className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                        title="Delete this course permanently"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -268,10 +539,7 @@ export default function CoursesPage() {
                   {hasPermission("courses:manage") && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedCourseForBatch(course.id);
-                        setIsAddBatchOpen(true);
-                      }}
+                      onClick={() => handleOpenAddBatch(course.id)}
                       className="text-[11px] font-bold text-[#00A896] hover:underline flex items-center gap-1"
                     >
                       <Plus className="w-3 h-3" /> Add Batch
@@ -367,17 +635,18 @@ export default function CoursesPage() {
                                   });
                                   setIsEditBatchOpen(true);
                                 }}
-                                className="p-1.5 bg-white hover:bg-stone-100 border border-stone-200 text-stone-600 rounded-lg"
-                                title="Edit Batch Details"
+                                className="px-2 py-1.5 bg-white hover:bg-stone-50 border border-stone-200 text-[#08415C] rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
+                                title="Edit batch name, schedule, start date & customize individual sessions"
                               >
-                                <Edit2 className="w-3.5 h-3.5" />
+                                <Edit2 className="w-3 h-3 text-[#08415C]" />
+                                <span>Edit / Customize</span>
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => handleDeleteBatch(batch.id, batch.batchName)}
-                                className="p-1.5 bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 rounded-lg"
-                                title="Delete Batch"
+                                className="p-1.5 bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 rounded-lg transition"
+                                title="Delete Batch Permanently"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -508,9 +777,9 @@ export default function CoursesPage() {
         isOpen={isAddBatchOpen}
         onClose={() => setIsAddBatchOpen(false)}
         title="Add Batch under Course"
-        subtitle="Create multiple parallel or sequential batches under one master course"
+        subtitle="Configure schedule routine, verify start date & customize sessions before creating"
       >
-        <form onSubmit={handleCreateBatch} className="space-y-3.5 text-xs">
+        <form onSubmit={handleCreateBatch} className="space-y-3.5 text-xs max-h-[80vh] overflow-y-auto pr-1">
           <div>
             <label className="block font-bold text-stone-700 uppercase mb-1">Batch Name *</label>
             <input
@@ -518,19 +787,82 @@ export default function CoursesPage() {
               required
               value={batchForm.batchName}
               onChange={(e) => setBatchForm({ ...batchForm, batchName: e.target.value })}
-              placeholder="e.g. Batch 2 – Sunday Evening"
-              className="w-full p-2.5 border border-stone-300 rounded-xl"
+              placeholder="e.g. Batch 1 (Saturday Evening)"
+              className="w-full p-2.5 border border-stone-300 rounded-xl font-semibold text-stone-800 outline-none focus:border-[#08415C]"
             />
+          </div>
+
+          {/* Quick Weekday & Time Chooser */}
+          <div className="p-3 bg-[#FAF8F5] border border-[#E5D8B8] rounded-xl space-y-2">
+            <label className="block font-bold text-[#08415C] uppercase text-[11px] flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-[#D4AF37]" />
+              Schedule Day of Week &amp; Time
+            </label>
+
+            <div className="grid grid-cols-7 gap-1">
+              {WEEKDAYS.map((day) => {
+                const isSelected = batchForm.selectedWeekday.toLowerCase() === day.toLowerCase();
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => handleBatchWeekdayChange(day)}
+                    className={`py-1.5 px-1 rounded-lg text-center font-bold text-[11px] transition ${
+                      isSelected
+                        ? "bg-[#08415C] text-white shadow-xs"
+                        : "bg-white border border-stone-200 text-stone-700 hover:bg-stone-50"
+                    }`}
+                  >
+                    {day.slice(0, 3)}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div>
+                <label className="block text-[10px] font-bold text-stone-600 uppercase mb-0.5">
+                  Time
+                </label>
+                <input
+                  type="text"
+                  value={batchForm.scheduleTime}
+                  onChange={(e) => handleBatchTimeChange(e.target.value)}
+                  className="w-full p-2 bg-white border border-stone-300 rounded-lg text-stone-800 outline-none focus:border-[#08415C] font-semibold"
+                  placeholder="e.g. 6:30 PM"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-stone-600 uppercase mb-0.5">
+                  Schedule Text
+                </label>
+                <input
+                  type="text"
+                  value={batchForm.scheduleInfo}
+                  onChange={(e) => setBatchForm({ ...batchForm, scheduleInfo: e.target.value })}
+                  className="w-full p-2 bg-white border border-stone-300 rounded-lg text-stone-800 outline-none focus:border-[#08415C]"
+                  placeholder="e.g. Every Saturday 6:30 PM"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-stone-700 uppercase mb-1">Start Date</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-bold text-stone-700 uppercase">Start Date *</label>
+                {batchForm.startDate && (
+                  <span className="text-[10px] font-bold text-[#08415C] bg-[#FAF8F5] px-1.5 py-0.5 rounded border border-[#E5D8B8]">
+                    {formatDisplayDate(batchForm.startDate)}
+                  </span>
+                )}
+              </div>
               <input
                 type="date"
+                required
                 value={batchForm.startDate}
-                onChange={(e) => setBatchForm({ ...batchForm, startDate: e.target.value })}
-                className="w-full p-2.5 border border-stone-300 rounded-xl"
+                onChange={(e) => handleBatchStartDateChange(e.target.value)}
+                className="w-full p-2.5 border border-stone-300 rounded-xl font-semibold text-stone-800 outline-none focus:border-[#08415C]"
               />
             </div>
             <div>
@@ -540,37 +872,141 @@ export default function CoursesPage() {
                 min={1}
                 max={50}
                 value={batchForm.totalSessions}
-                onChange={(e) => setBatchForm({ ...batchForm, totalSessions: parseInt(e.target.value) || 8 })}
-                className="w-full p-2.5 border border-stone-300 rounded-xl"
+                onChange={(e) => handleBatchTotalSessionsChange(parseInt(e.target.value) || 8)}
+                className="w-full p-2.5 border border-stone-300 rounded-xl font-semibold text-stone-800 outline-none focus:border-[#08415C]"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block font-bold text-stone-700 uppercase mb-1">Schedule Info (Day & Time)</label>
-            <input
-              type="text"
-              value={batchForm.scheduleInfo}
-              onChange={(e) => setBatchForm({ ...batchForm, scheduleInfo: e.target.value })}
-              placeholder="e.g. Every Sunday 6:00 PM - 7:30 PM"
-              className="w-full p-2.5 border border-stone-300 rounded-xl"
-            />
+          {/* Weekday Mismatch Alert & Auto Snap */}
+          {batchForm.startDate &&
+            getDayOfWeekFromDateString(batchForm.startDate).toLowerCase() !==
+              batchForm.selectedWeekday.toLowerCase() && (
+              <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <span>
+                    Start Date is <strong>{getDayOfWeekFromDateString(batchForm.startDate)}</strong>, but schedule is set for <strong>{batchForm.selectedWeekday}</strong>!
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSnapBatchWeekday(batchForm.selectedWeekday)}
+                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 whitespace-nowrap shadow-xs"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Snap to next {batchForm.selectedWeekday}</span>
+                </button>
+              </div>
+            )}
+
+          {/* Schedule Preview Grid */}
+          {batchForm.startDate && (
+            <div className="p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-1.5">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                Generated Schedule Preview:
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {batchForm.customSessions.slice(0, 4).map((s, idx) => (
+                  <div
+                    key={idx}
+                    className="text-[11px] px-2 py-1 bg-white/90 rounded-lg border border-emerald-200 flex items-center justify-between"
+                  >
+                    <span className="font-bold text-emerald-900">S{s.sessionNumber}:</span>
+                    <span className="text-stone-700 font-mono text-[10px]">
+                      {formatDisplayDate(s.sessionDate)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Expandable Custom Sessions Editor */}
+          <div className="border border-stone-200 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() =>
+                setBatchForm((prev) => ({
+                  ...prev,
+                  showCustomSessions: !prev.showCustomSessions,
+                }))
+              }
+              className="w-full p-2.5 bg-[#FAF8F5] hover:bg-stone-100 flex items-center justify-between text-left font-bold text-stone-700 transition"
+            >
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-[#08415C]" />
+                <span>Fine-Tune Individual Sessions ({batchForm.totalSessions} Sessions)</span>
+              </div>
+              {batchForm.showCustomSessions ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+
+            {batchForm.showCustomSessions && (
+              <div className="p-2.5 max-h-52 overflow-y-auto space-y-2 bg-white divide-y divide-stone-100">
+                {batchForm.customSessions.map((sess, idx) => (
+                  <div
+                    key={idx}
+                    className="pt-2 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <span className="w-6 h-6 rounded bg-stone-100 font-bold text-stone-600 flex items-center justify-center text-[10px] flex-shrink-0">
+                        S{sess.sessionNumber}
+                      </span>
+                      <input
+                        type="text"
+                        value={sess.title}
+                        onChange={(e) => {
+                          const updated = [...batchForm.customSessions];
+                          updated[idx] = { ...updated[idx], title: e.target.value };
+                          setBatchForm((prev) => ({ ...prev, customSessions: updated }));
+                        }}
+                        className="p-1 border border-stone-300 rounded-lg text-xs font-semibold text-stone-800 outline-none focus:border-[#08415C] flex-1"
+                        placeholder={`Session ${sess.sessionNumber} Title`}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="date"
+                        value={sess.sessionDate}
+                        onChange={(e) => {
+                          const updated = [...batchForm.customSessions];
+                          updated[idx] = { ...updated[idx], sessionDate: e.target.value };
+                          setBatchForm((prev) => ({ ...prev, customSessions: updated }));
+                        }}
+                        className="p-1 border border-stone-300 rounded-lg text-[11px] font-mono outline-none focus:border-[#08415C]"
+                      />
+                      {sess.sessionDate && (
+                        <span className="text-[10px] font-semibold text-stone-500 whitespace-nowrap bg-stone-50 px-1 py-0.5 rounded border border-stone-200">
+                          {getDayOfWeekFromDateString(sess.sessionDate).slice(0, 3)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="pt-2 flex justify-end gap-2">
+          <div className="pt-2 flex justify-end gap-2 border-t border-stone-100">
             <button
               type="button"
               onClick={() => setIsAddBatchOpen(false)}
-              className="px-4 py-2 border rounded-xl text-stone-600 font-bold"
+              className="px-4 py-2 border rounded-xl text-stone-600 font-bold hover:bg-stone-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-[#08415C] text-white rounded-xl font-bold"
+              className="px-4 py-2 bg-[#08415C] hover:bg-[#063349] text-white rounded-xl font-bold shadow-gold transition disabled:opacity-60 flex items-center gap-1.5"
             >
-              {submitting ? "Creating..." : "Save Batch"}
+              <CheckCircle2 className="w-4 h-4 text-[#D4AF37]" />
+              <span>{submitting ? "Creating..." : "Save Batch"}</span>
             </button>
           </div>
         </form>
@@ -645,6 +1081,18 @@ export default function CoursesPage() {
         }}
         batch={batchToEdit}
         onSuccess={() => fetchCourses()}
+      />
+
+      {/* Modal: Edit Course */}
+      <EditCourseModal
+        isOpen={isEditCourseOpen}
+        onClose={() => {
+          setIsEditCourseOpen(false);
+          setCourseToEdit(null);
+        }}
+        course={courseToEdit}
+        onCourseUpdated={() => fetchCourses()}
+        onCourseDeleted={() => fetchCourses()}
       />
     </div>
   );

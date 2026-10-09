@@ -29,8 +29,11 @@ import {
   Edit2,
   Calendar,
   Clock,
+  Trash2,
+  Settings,
 } from "lucide-react";
 import EditBatchModal from "@/components/courses/EditBatchModal";
+import EditCourseModal from "@/components/courses/EditCourseModal";
 import Modal from "@/components/common/Modal";
 
 function CourseAttendanceMatrixInner() {
@@ -52,6 +55,7 @@ function CourseAttendanceMatrixInner() {
   const [searchQuery, setSearchQuery] = useState("");
   const [markingSessionId, setMarkingSessionId] = useState<string | null>(null);
   const [isEditBatchOpen, setIsEditBatchOpen] = useState(false);
+  const [isEditCourseOpen, setIsEditCourseOpen] = useState(false);
   const [isEditSessionOpen, setIsEditSessionOpen] = useState(false);
   const [sessionEditForm, setSessionEditForm] = useState({
     id: "",
@@ -101,6 +105,88 @@ function CourseAttendanceMatrixInner() {
       console.error("Error saving session:", err);
     } finally {
       setSavingSession(false);
+    }
+  };
+
+  const handleDeleteCurrentBatch = async () => {
+    if (!batch || !batch.id) return;
+    const confirmName = prompt(
+      `⚠️ WARNING: Deleting batch "${batch.batchName}" will permanently remove all its sessions, enrollments, and attendance records.\n\nType "DELETE" to confirm:`
+    );
+    if (confirmName !== "DELETE") return;
+
+    try {
+      const res = await fetch(`/api/courses/batches?id=${batch.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        const otherBatches = (course?.batches || []).filter((b: any) => b.id !== batch.id);
+        if (otherBatches.length > 0) {
+          setSelectedBatchId(otherBatches[0].id);
+          fetchCourseDetails();
+        } else {
+          window.location.href = "/courses";
+        }
+      } else {
+        const d = await res.json();
+        alert(d.error || "Failed to delete batch");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting batch");
+    }
+  };
+
+  const handleAddNewSession = async () => {
+    if (!batch || !batch.id) return;
+    const nextNum = sessions.length + 1;
+    let nextDate = new Date();
+    if (sessions.length > 0) {
+      const last = sessions[sessions.length - 1];
+      const d = new Date(last.sessionDate);
+      if (!isNaN(d.getTime())) {
+        nextDate = new Date(d.getTime() + 7 * 24 * 60 * 60 * 1000);
+      }
+    }
+    const dateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}-${String(nextDate.getDate()).padStart(2, "0")}`;
+
+    try {
+      const res = await fetch("/api/courses/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          batchId: batch.id,
+          sessionNumber: nextNum,
+          title: `Session ${nextNum}`,
+          sessionDate: dateStr,
+          sessionTime: batch.scheduleInfo || "6:30 PM",
+        }),
+      });
+      if (res.ok) {
+        fetchCourseDetails();
+      }
+    } catch (err) {
+      console.error("Error creating session:", err);
+    }
+  };
+
+  const handleDeleteCurrentSession = async (sessionId: string) => {
+    if (!confirm("Are you sure you want to delete this session? Attendances recorded for this session will be permanently removed.")) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/courses/sessions?id=${sessionId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setIsEditSessionOpen(false);
+        fetchCourseDetails();
+      } else {
+        const d = await res.json();
+        alert(d.error || "Failed to delete session");
+      }
+    } catch (err) {
+      console.error("Error deleting session:", err);
     }
   };
 
@@ -375,6 +461,16 @@ function CourseAttendanceMatrixInner() {
             </Link>
 
             <button
+              type="button"
+              onClick={() => setIsEditCourseOpen(true)}
+              className="px-3.5 py-2 bg-white border border-[#E5D8B8] hover:border-[#D4AF37] text-xs font-bold text-[#08415C] rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
+              title="Edit / Customize course details"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>✏️ Edit Course</span>
+            </button>
+
+            <button
               onClick={handleExportExcel}
               className="px-3.5 py-2 bg-white border border-[#E5D8B8] hover:border-[#D4AF37] text-xs font-semibold text-[#08415C] rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
             >
@@ -385,11 +481,21 @@ function CourseAttendanceMatrixInner() {
             <button
               type="button"
               onClick={() => setIsEditBatchOpen(true)}
-              className="px-3.5 py-2 bg-white border border-[#E5D8B8] hover:border-[#08415C] text-xs font-semibold text-[#08415C] rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
-              title="Edit Batch Name, Schedule, Start Date & Auto-sync Session Dates"
+              className="px-3.5 py-2 bg-[#08415C] hover:bg-[#063349] text-xs font-bold text-white rounded-xl shadow-gold flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
+              title="Edit Batch Name, Schedule, Start Date & Full Session Customization"
             >
-              <Edit2 className="w-4 h-4 text-[#08415C]" />
-              <span>Edit Batch &amp; Dates</span>
+              <Settings className="w-4 h-4 text-[#D4AF37]" />
+              <span>⚙️ Customize &amp; Edit Batch</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDeleteCurrentBatch}
+              className="px-3 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-xs font-bold text-rose-700 rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
+              title="Delete this batch permanently"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>Delete Batch</span>
             </button>
           </div>
         </div>
@@ -461,8 +567,8 @@ function CourseAttendanceMatrixInner() {
                   }`}
                 >
                   <span>S{sess.sessionNumber}</span>
-                  <span className="text-[10px] font-normal opacity-75">
-                    ({new Date(sess.sessionDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })})
+                  <span className="text-[10px] font-normal opacity-85">
+                    ({new Date(sess.sessionDate).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })})
                   </span>
                 </button>
               );
@@ -478,6 +584,15 @@ function CourseAttendanceMatrixInner() {
                 <span>Edit S{currentSession.sessionNumber} Date</span>
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleAddNewSession}
+              className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-xl font-bold flex items-center gap-1 transition whitespace-nowrap text-xs shadow-xs ml-1"
+              title="Add a new session (Session n+1) to this batch"
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-700" />
+              <span>+ Add Session</span>
+            </button>
           </div>
         )}
       </div>
@@ -750,10 +865,19 @@ function CourseAttendanceMatrixInner() {
                     <th className="p-3.5 min-w-[180px]">Student Name &amp; Locality</th>
                     <th className="p-3.5 min-w-[120px]">Assigned Sewak</th>
                     {sessions.map((sess: any) => (
-                      <th key={sess.id} className="p-3 text-center min-w-[90px]">
-                        <div>S{sess.sessionNumber}</div>
-                        <div className="text-[10px] text-gray-400 font-normal">
+                      <th
+                        key={sess.id}
+                        className="p-2.5 text-center min-w-[95px] hover:bg-stone-100/70 transition cursor-pointer group"
+                        onClick={() => handleOpenEditCurrentSession(sess)}
+                        title={`Click to edit S${sess.sessionNumber} (${sess.title}) date/time`}
+                      >
+                        <div className="font-bold text-[#08415C] flex items-center justify-center gap-1">
+                          <span>S{sess.sessionNumber}</span>
+                          <Edit2 className="w-2.5 h-2.5 text-[#00A896] opacity-0 group-hover:opacity-100 transition" />
+                        </div>
+                        <div className="text-[10px] text-stone-600 font-medium capitalize">
                           {new Date(sess.sessionDate).toLocaleDateString("en-IN", {
+                            weekday: "short",
                             day: "numeric",
                             month: "short",
                           })}
@@ -974,25 +1098,48 @@ function CourseAttendanceMatrixInner() {
             />
           </div>
 
-          <div className="pt-3 flex justify-end gap-2 border-t border-stone-100">
+          <div className="pt-3 flex items-center justify-between gap-2 border-t border-stone-100">
             <button
               type="button"
-              onClick={() => setIsEditSessionOpen(false)}
-              className="px-4 py-2 border rounded-xl text-stone-600 font-bold hover:bg-stone-50"
+              onClick={() => handleDeleteCurrentSession(sessionEditForm.id)}
+              className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl font-bold flex items-center gap-1.5 transition text-xs"
+              title="Delete this session from the batch"
             >
-              Cancel
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>Delete Session</span>
             </button>
-            <button
-              type="submit"
-              disabled={savingSession}
-              className="px-4 py-2 bg-[#08415C] hover:bg-[#063349] text-white rounded-xl font-bold shadow-gold flex items-center gap-1.5 transition disabled:opacity-60"
-            >
-              <CheckCircle2 className="w-4 h-4 text-[#D4AF37]" />
-              <span>{savingSession ? "Saving..." : "Save Date"}</span>
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEditSessionOpen(false)}
+                className="px-4 py-2 border rounded-xl text-stone-600 font-bold hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingSession}
+                className="px-4 py-2 bg-[#08415C] hover:bg-[#063349] text-white rounded-xl font-bold shadow-gold flex items-center gap-1.5 transition disabled:opacity-60"
+              >
+                <CheckCircle2 className="w-4 h-4 text-[#D4AF37]" />
+                <span>{savingSession ? "Saving..." : "Save Date"}</span>
+              </button>
+            </div>
           </div>
         </form>
       </Modal>
+
+      {/* Modal: Edit Course */}
+      <EditCourseModal
+        isOpen={isEditCourseOpen}
+        onClose={() => setIsEditCourseOpen(false)}
+        course={course}
+        onCourseUpdated={() => fetchCourseDetails()}
+        onCourseDeleted={() => {
+          window.location.href = "/courses";
+        }}
+      />
     </div>
   );
 }

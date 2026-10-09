@@ -11,7 +11,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized. User management access required." }, { status: 403 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const includeInactive = searchParams.get("includeInactive") === "true";
+
     const users = await prisma.user.findMany({
+      where: includeInactive ? undefined : { active: true },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -158,7 +162,7 @@ export async function PATCH(req: NextRequest) {
 
     const updateData: any = {};
     if (role !== undefined) updateData.role = role;
-    if (active !== undefined) updateData.active = active;
+    if (active !== undefined) updateData.active = Boolean(active);
     if (newPassword) updateData.passwordHash = hashPassword(newPassword);
     if (privileges !== undefined) {
       updateData.privileges = privileges && Array.isArray(privileges) ? JSON.stringify(privileges) : null;
