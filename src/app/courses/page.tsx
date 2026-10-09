@@ -363,6 +363,7 @@ export default function CoursesPage() {
                                     startDate: batch.startDate,
                                     active: batch.active,
                                     courseTitle: course.title,
+                                    sessions: batch.sessions,
                                   });
                                   setIsEditBatchOpen(true);
                                 }}

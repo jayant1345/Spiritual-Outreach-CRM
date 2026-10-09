@@ -88,7 +88,7 @@ export async function POST(request: Request) {
           title: `Session ${i}: Gita Shiksha Module ${i}`,
           sessionDate,
           sessionTime: "6:30 PM",
-          completed: i <= 4,
+          completed: false,
         },
       });
     }

@@ -26,7 +26,12 @@ import {
   Search,
   TableProperties,
   Check,
+  Edit2,
+  Calendar,
+  Clock,
 } from "lucide-react";
+import EditBatchModal from "@/components/courses/EditBatchModal";
+import Modal from "@/components/common/Modal";
 
 function CourseAttendanceMatrixInner() {
   const params = useParams();
@@ -46,6 +51,58 @@ function CourseAttendanceMatrixInner() {
   const [selectedRegularity, setSelectedRegularity] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [markingSessionId, setMarkingSessionId] = useState<string | null>(null);
+  const [isEditBatchOpen, setIsEditBatchOpen] = useState(false);
+  const [isEditSessionOpen, setIsEditSessionOpen] = useState(false);
+  const [sessionEditForm, setSessionEditForm] = useState({
+    id: "",
+    title: "",
+    sessionDate: "",
+    sessionTime: "",
+  });
+  const [savingSession, setSavingSession] = useState(false);
+
+  const handleOpenEditCurrentSession = (sess: any) => {
+    if (!sess) return;
+    const d = new Date(sess.sessionDate);
+    const dateStr = !isNaN(d.getTime())
+      ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+      : "";
+    setSessionEditForm({
+      id: sess.id,
+      title: sess.title || `Session ${sess.sessionNumber}`,
+      sessionDate: dateStr,
+      sessionTime: sess.sessionTime || batch?.scheduleInfo || "",
+    });
+    setIsEditSessionOpen(true);
+  };
+
+  const handleSaveSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sessionEditForm.id) return;
+    setSavingSession(true);
+    try {
+      const res = await fetch("/api/courses/sessions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: sessionEditForm.id,
+          title: sessionEditForm.title,
+          sessionDate: sessionEditForm.sessionDate
+            ? new Date(`${sessionEditForm.sessionDate}T12:00:00Z`).toISOString()
+            : undefined,
+          sessionTime: sessionEditForm.sessionTime,
+        }),
+      });
+      if (res.ok) {
+        setIsEditSessionOpen(false);
+        fetchCourseDetails();
+      }
+    } catch (err) {
+      console.error("Error saving session:", err);
+    } finally {
+      setSavingSession(false);
+    }
+  };
 
   const fetchCourseDetails = async () => {
     setLoading(true);
@@ -324,6 +381,16 @@ function CourseAttendanceMatrixInner() {
               <FileSpreadsheet className="w-4 h-4 text-[#00A896]" />
               <span>Export Matrix (.xlsx)</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setIsEditBatchOpen(true)}
+              className="px-3.5 py-2 bg-white border border-[#E5D8B8] hover:border-[#08415C] text-xs font-semibold text-[#08415C] rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
+              title="Edit Batch Name, Schedule, Start Date & Auto-sync Session Dates"
+            >
+              <Edit2 className="w-4 h-4 text-[#08415C]" />
+              <span>Edit Batch &amp; Dates</span>
+            </button>
           </div>
         </div>
 
@@ -400,6 +467,17 @@ function CourseAttendanceMatrixInner() {
                 </button>
               );
             })}
+            {currentSession && (
+              <button
+                type="button"
+                onClick={() => handleOpenEditCurrentSession(currentSession)}
+                className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-xl font-bold flex items-center gap-1 transition whitespace-nowrap text-xs shadow-xs ml-1"
+                title={`Reschedule or edit S${currentSession.sessionNumber} date`}
+              >
+                <Calendar className="w-3.5 h-3.5 text-amber-700" />
+                <span>Edit S{currentSession.sessionNumber} Date</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -826,6 +904,95 @@ function CourseAttendanceMatrixInner() {
           </div>
         </div>
       )}
+
+      {/* Edit Batch Modal */}
+      <EditBatchModal
+        isOpen={isEditBatchOpen}
+        onClose={() => setIsEditBatchOpen(false)}
+        batch={{
+          id: batch.id,
+          batchName: batch.batchName,
+          scheduleInfo: batch.scheduleInfo,
+          startDate: batch.startDate,
+          active: batch.active,
+          courseTitle: course.title,
+          sessions: batch.sessions,
+        }}
+        onSuccess={() => fetchCourseDetails()}
+      />
+
+      {/* Edit Single Session Modal */}
+      <Modal
+        isOpen={isEditSessionOpen}
+        onClose={() => setIsEditSessionOpen(false)}
+        title="Edit Session Schedule"
+        subtitle={`Update date & time for ${sessionEditForm.title || "Session"}`}
+      >
+        <form onSubmit={handleSaveSession} className="space-y-4 text-xs">
+          <div>
+            <label className="block font-bold text-stone-700 uppercase mb-1">
+              Session Title
+            </label>
+            <input
+              type="text"
+              required
+              value={sessionEditForm.title}
+              onChange={(e) =>
+                setSessionEditForm({ ...sessionEditForm, title: e.target.value })
+              }
+              className="w-full p-2.5 border border-stone-300 rounded-xl font-semibold text-stone-800 outline-none focus:border-[#08415C]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-stone-700 uppercase mb-1">
+              Session Date *
+            </label>
+            <input
+              type="date"
+              required
+              value={sessionEditForm.sessionDate}
+              onChange={(e) =>
+                setSessionEditForm({ ...sessionEditForm, sessionDate: e.target.value })
+              }
+              className="w-full p-2.5 border border-stone-300 rounded-xl font-semibold text-stone-800 outline-none focus:border-[#08415C]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-stone-700 uppercase mb-1">
+              Session Time / Schedule Info
+            </label>
+            <input
+              type="text"
+              value={sessionEditForm.sessionTime}
+              onChange={(e) =>
+                setSessionEditForm({ ...sessionEditForm, sessionTime: e.target.value })
+              }
+              placeholder="e.g. 6:30 PM"
+              className="w-full p-2.5 border border-stone-300 rounded-xl text-stone-800 outline-none focus:border-[#08415C]"
+            />
+          </div>
+
+          <div className="pt-3 flex justify-end gap-2 border-t border-stone-100">
+            <button
+              type="button"
+              onClick={() => setIsEditSessionOpen(false)}
+              className="px-4 py-2 border rounded-xl text-stone-600 font-bold hover:bg-stone-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={savingSession}
+              className="px-4 py-2 bg-[#08415C] hover:bg-[#063349] text-white rounded-xl font-bold shadow-gold flex items-center gap-1.5 transition disabled:opacity-60"
+            >
+              <CheckCircle2 className="w-4 h-4 text-[#D4AF37]" />
+              <span>{savingSession ? "Saving..." : "Save Date"}</span>
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
