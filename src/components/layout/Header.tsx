@@ -21,6 +21,7 @@ import {
   Layers,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { CRMContext } from "./RootShell";
 import { useRouter } from "next/navigation";
 
@@ -38,26 +39,17 @@ export const Header: React.FC<HeaderProps> = ({
   const { user, logout } = useAuth();
   const router = useRouter();
   const { openPersonModal, openCallModal } = useContext(CRMContext);
+  const {
+    selectedCourseId,
+    selectedBatchIds,
+    courses,
+    setWorkspace,
+    activeCourseTitle,
+    activeBatchSummary,
+  } = useWorkspace();
 
   const [activeCenter] = useState("Chandkheda Center");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-
-  // Course & Batch Switcher State (Admin / Team Leader / Coordinator)
-  const [headerCourses, setHeaderCourses] = useState<any[]>([]);
-  const [activeCourseId, setActiveCourseId] = useState<string>("ALL");
-  const [activeBatchId, setActiveBatchId] = useState<string>("ALL");
-
-  useEffect(() => {
-    fetch("/api/courses")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setHeaderCourses(data);
-      })
-      .catch((e) => console.error("Error fetching courses for header:", e));
-  }, []);
-
-  const selectedCourse = headerCourses.find((c: any) => c.id === activeCourseId);
-  const activeCourseBatches = selectedCourse?.batches || [];
 
   // Search Bar State
   const [query, setQuery] = useState("");
@@ -203,27 +195,26 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       )}
 
-      {/* Course & Batch Quick Switcher (Replaces static text with Course & Batch Switcher) */}
-      <div className="hidden xl:flex items-center gap-1.5 flex-shrink-0">
+      {/* Course & Batch Quick Switcher (Step 5 PRD: Quick Switching without logout) */}
+      <div className="hidden lg:flex items-center gap-1.5 flex-shrink-0">
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold text-[#08415C] shadow-2xs">
           <GraduationCap className="w-3.5 h-3.5 text-[#D4AF37]" />
           <span className="text-stone-400 font-normal">Course:</span>
           <select
-            value={activeCourseId}
+            value={selectedCourseId}
             onChange={(e) => {
               const cId = e.target.value;
-              setActiveCourseId(cId);
-              setActiveBatchId("ALL");
-              if (cId !== "ALL") {
-                router.push(`/courses/${cId}`);
+              if (cId === "ALL") {
+                setWorkspace("ALL", []);
               } else {
-                router.push(`/courses`);
+                const c = courses.find((x) => x.id === cId);
+                setWorkspace(cId, c ? c.batches.map((b) => b.id) : []);
               }
             }}
-            className="bg-transparent text-[#08415C] font-bold outline-none cursor-pointer text-xs max-w-[140px] truncate"
+            className="bg-transparent text-[#08415C] font-bold outline-none cursor-pointer text-xs max-w-[130px] truncate"
           >
             <option value="ALL">All Courses</option>
-            {headerCourses.map((c: any) => (
+            {courses.map((c: any) => (
               <option key={c.id} value={c.id}>
                 {c.title}
               </option>
@@ -235,26 +226,35 @@ export const Header: React.FC<HeaderProps> = ({
           <Layers className="w-3.5 h-3.5 text-[#00A896]" />
           <span className="text-stone-400 font-normal">Batch:</span>
           <select
-            value={activeBatchId}
+            value={selectedBatchIds.length === 1 ? selectedBatchIds[0] : "ALL"}
             onChange={(e) => {
               const bId = e.target.value;
-              setActiveBatchId(bId);
-              const selCourse = headerCourses.find((c: any) => c.id === activeCourseId);
-              const selBatch = selCourse?.batches?.find((b: any) => b.id === bId);
-              if (selBatch) {
-                router.push(`/calling-sewa?batch=${encodeURIComponent(selBatch.batchName)}`);
+              if (bId === "ALL") {
+                const currentCourse = courses.find((c) => c.id === selectedCourseId);
+                setWorkspace(selectedCourseId, currentCourse ? currentCourse.batches.map((b) => b.id) : []);
+              } else {
+                setWorkspace(selectedCourseId, [bId]);
               }
             }}
-            className="bg-transparent text-[#08415C] font-bold outline-none cursor-pointer text-xs max-w-[120px] truncate"
+            className="bg-transparent text-[#08415C] font-bold outline-none cursor-pointer text-xs max-w-[110px] truncate"
           >
-            <option value="ALL">All Batches</option>
-            {activeCourseBatches.map((b: any) => (
+            <option value="ALL">{activeBatchSummary}</option>
+            {courses.find((c) => c.id === selectedCourseId)?.batches.map((b: any) => (
               <option key={b.id} value={b.id}>
                 {b.batchName}
               </option>
             ))}
           </select>
         </div>
+
+        <button
+          type="button"
+          onClick={() => router.push("/select-batch")}
+          className="px-2.5 py-1.5 bg-[#FAF5E6] hover:bg-[#F2E7CA] border border-[#E5D8B8] text-[#B8860B] rounded-xl text-xs font-bold flex items-center gap-1 transition shadow-2xs"
+          title="Switch Course and Multiple Batches"
+        >
+          <span>⚡ Switch</span>
+        </button>
       </div>
 
       {/* Active Global Search Bar */}

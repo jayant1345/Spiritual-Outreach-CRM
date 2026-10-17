@@ -10,6 +10,7 @@ import CallActionModal from "../calling/CallActionModal";
 import SendWhatsAppModal from "../whatsapp/SendWhatsAppModal";
 import PersonModal from "../people/PersonModal";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 
 export const CRMContext = React.createContext<{
   openPersonModal: (id: string) => void;
@@ -162,7 +163,9 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
 export default function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <AuthenticatedAppShell>{children}</AuthenticatedAppShell>
+      <WorkspaceProvider>
+        <AuthenticatedAppShell>{children}</AuthenticatedAppShell>
+      </WorkspaceProvider>
     </AuthProvider>
   );
 }

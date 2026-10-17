@@ -9,7 +9,10 @@ import {
   PhoneCall,
   GraduationCap,
   Menu,
+  CheckSquare,
+  MessageSquare,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface MobileBottomNavProps {
   onOpenMobileMenu: () => void;
@@ -17,33 +20,55 @@ interface MobileBottomNavProps {
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenMobileMenu }) => {
   const pathname = usePathname();
+  const { isCallingVolunteer } = useAuth();
 
-  const navItems = [
-    {
-      label: "Home",
-      href: "/",
-      icon: LayoutDashboard,
-      isActive: pathname === "/",
-    },
-    {
-      label: "Members",
-      href: "/people",
-      icon: Users,
-      isActive: pathname === "/people",
-    },
-    {
-      label: "Calling",
-      href: "/calling-sewa",
-      icon: PhoneCall,
-      isActive: pathname === "/calling-sewa" || pathname === "/todays-work",
-    },
-    {
-      label: "Courses",
-      href: "/courses",
-      icon: GraduationCap,
-      isActive: pathname.startsWith("/courses") || pathname === "/attendance",
-    },
-  ];
+  const navItems = isCallingVolunteer
+    ? [
+        {
+          label: "My Calls",
+          href: "/calling-sewa",
+          icon: PhoneCall,
+          isActive: pathname === "/calling-sewa",
+        },
+        {
+          label: "Today",
+          href: "/todays-work",
+          icon: CheckSquare,
+          isActive: pathname === "/todays-work",
+        },
+        {
+          label: "WhatsApp",
+          href: "/whatsapp",
+          icon: MessageSquare,
+          isActive: pathname === "/whatsapp",
+        },
+      ]
+    : [
+        {
+          label: "Home",
+          href: "/",
+          icon: LayoutDashboard,
+          isActive: pathname === "/",
+        },
+        {
+          label: "Members",
+          href: "/people",
+          icon: Users,
+          isActive: pathname === "/people",
+        },
+        {
+          label: "Calling",
+          href: "/calling-sewa",
+          icon: PhoneCall,
+          isActive: pathname === "/calling-sewa" || pathname === "/todays-work",
+        },
+        {
+          label: "Courses",
+          href: "/courses",
+          icon: GraduationCap,
+          isActive: pathname.startsWith("/courses") || pathname === "/attendance",
+        },
+      ];
 
   return (
     <nav

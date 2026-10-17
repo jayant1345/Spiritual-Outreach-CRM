@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import prisma from "./prisma";
-import { getEffectivePermissions, PermissionKey } from "./permissions";
+import { getEffectivePermissions, PermissionKey, UserRole } from "./permissions";
 
 const AUTH_COOKIE_NAME = "chandkheda_crm_session";
 const SESSION_SECRET = process.env.SESSION_SECRET || "chandkheda-spiritual-crm-sacred-key-2026";
@@ -13,7 +13,7 @@ export interface SessionUser {
   email: string;
   username?: string | null;
   phone?: string | null;
-  role: "SUPER_ADMIN" | "COORDINATOR" | "CALLING_VOLUNTEER" | "RELATIONSHIP_VOLUNTEER";
+  role: UserRole;
   avatar?: string | null;
   privileges?: string[] | null;
   permissions?: PermissionKey[];

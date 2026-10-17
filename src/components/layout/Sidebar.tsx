@@ -54,11 +54,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (isCallingVolunteer) {
       return [
         {
-          groupTitle: "My Seva",
+          groupTitle: "My Calling Seva",
           items: [
-            { name: "Dashboard", href: "/", icon: LayoutDashboard },
+            { name: "My Calling Dashboard", href: "/calling-sewa", icon: PhoneCall },
             { name: "Today's Work", href: "/todays-work", icon: CheckSquare },
-            { name: "Calling Desk", href: "/calling-sewa", icon: PhoneCall },
             { name: "WhatsApp Messages", href: "/whatsapp", icon: MessageSquare },
           ],
         },

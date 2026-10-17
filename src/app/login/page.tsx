@@ -16,10 +16,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // If already authenticated, redirect to home
+  // If already authenticated, redirect according to role journey
   useEffect(() => {
     if (!authLoading && user) {
-      router.push("/");
+      if (user.role === "CALLING_VOLUNTEER") {
+        router.push("/calling-sewa");
+      } else {
+        router.push("/select-batch");
+      }
     }
   }, [user, authLoading, router]);
 

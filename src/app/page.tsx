@@ -2,7 +2,10 @@
 
 import React, { useEffect, useState, useContext } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CRMContext } from "@/components/layout/RootShell";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import Badge from "@/components/common/Badge";
 import {
   Users,
@@ -19,14 +22,38 @@ import {
   Flame,
   Calendar,
   Filter,
+  Layers,
+  CheckSquare,
+  TrendingUp,
+  UserCheck,
+  ShieldCheck,
+  Building2,
+  RefreshCw,
 } from "lucide-react";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user, isCallingVolunteer } = useAuth();
+  const {
+    selectedCourseId,
+    selectedBatchIds,
+    activeCourseTitle,
+    activeBatchSummary,
+    selectedCourse,
+  } = useWorkspace();
+
   const { openPersonModal, openCallModal, openWhatsAppModal, refreshTrigger } = useContext(CRMContext);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedMonth, setSelectedMonth] = useState<string>("2026-10");
   const [activeQueueTab, setActiveQueueTab] = useState<"today" | "callbacks" | "absentee">("today");
+
+  // Calling Volunteer Journey: redirect directly to My Calling Desk
+  useEffect(() => {
+    if (user && isCallingVolunteer) {
+      router.replace("/calling-sewa");
+    }
+  }, [user, isCallingVolunteer, router]);
 
   const monthOptions = [
     { value: "2026-10", label: "October 2026 (Current)" },
@@ -39,7 +66,14 @@ export default function DashboardPage() {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/stats?month=${selectedMonth}`);
+      const queryParams = new URLSearchParams({
+        month: selectedMonth,
+        courseId: selectedCourseId,
+        batchIds: selectedBatchIds.join(","),
+        scope: "all",
+      });
+
+      const res = await fetch(`/api/stats?${queryParams.toString()}`);
       const data = await res.json();
       setStats(data);
     } catch (err) {
@@ -51,7 +85,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchStats();
-  }, [refreshTrigger, selectedMonth]);
+  }, [refreshTrigger, selectedMonth, selectedCourseId, selectedBatchIds]);
 
   if (loading && !stats) {
     return (
@@ -65,9 +99,51 @@ export default function DashboardPage() {
   }
 
   const currentStats = stats || {};
+  const batchPerformance = currentStats.batchPerformance || [];
+  const volunteerPerformance = currentStats.volunteerPerformance || [];
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* ACTIVE WORKSPACE BANNER (Course & Batch Focus Indicator) */}
+      <div className="bg-gradient-to-r from-white via-[#FAF5E6]/60 to-white p-3.5 sm:p-4 rounded-2xl border border-[#D4AF37] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-start sm:items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#08415C] text-[#D4AF37] flex items-center justify-center flex-shrink-0 shadow-xs">
+            <GraduationCap className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#08415C] text-white">
+                Active Workspace
+              </span>
+              <span className="text-xs font-semibold text-stone-500">•</span>
+              <span className="text-xs font-bold text-[#08415C]">
+                {activeCourseTitle}
+              </span>
+              <span className="text-xs font-semibold text-stone-500">•</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 flex items-center gap-1">
+                <Layers className="w-3 h-3 text-[#00A896]" />
+                <span>{activeBatchSummary}</span>
+              </span>
+            </div>
+            <p className="text-[11px] text-stone-500 mt-0.5">
+              Dashboard figures, pending follow-ups, and calling metrics are filtered for this spiritual cohort.
+            </p>
+          </div>
+        </div>
+
+        {/* Change Course / Batch Button */}
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <button
+            type="button"
+            onClick={() => router.push("/select-batch")}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white border border-[#D4AF37] text-[#08415C] hover:bg-[#FAF5E6] transition text-xs font-bold shadow-2xs"
+          >
+            <span>⚡ Change Course / Batches</span>
+            <ArrowRight className="w-3.5 h-3.5 text-[#B8860B]" />
+          </button>
+        </div>
+      </div>
+
       {/* Header Banner & Monthly Filter Control */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
@@ -101,120 +177,277 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 4 Clickable Report/Statistics KPI Cards (Compact & Mobile-Optimized) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-        {/* Card 1: Total Members -> Click opens /people */}
+      {/* STEP 4 PRD: 6 SPECIFIC METRIC KPI CARDS */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3.5">
+        {/* Metric 1: Total Contacts */}
         <Link
           href="/people"
-          className="gold-card p-3 sm:p-4 hover:border-[#08415C] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#08415C]"
-          title="Click to view full Members directory"
+          className="gold-card p-3 sm:p-3.5 hover:border-[#08415C] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#08415C]"
+          title="Total Contacts in workspace"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-semibold text-[#78909C] uppercase tracking-wider truncate">
-              Total Members
+            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+              Total Contacts
             </span>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#08415C]/10 text-[#08415C] flex items-center justify-center flex-shrink-0">
-              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <div className="w-6 h-6 rounded-lg bg-[#08415C]/10 text-[#08415C] flex items-center justify-center flex-shrink-0">
+              <Users className="w-3 h-3" />
             </div>
           </div>
-          <div className="my-1.5 sm:my-2">
-            <div className="text-2xl sm:text-3xl font-serif font-bold text-[#08415C]">
-              {currentStats.totalPeople || 0}
+          <div className="my-1.5">
+            <div className="text-xl sm:text-2xl font-serif font-bold text-[#08415C]">
+              {currentStats.totalContacts ?? currentStats.totalPeople ?? 0}
             </div>
-            <div className="text-[10px] sm:text-xs font-semibold text-[#00A896]">
-              +{currentStats.newMembersThisMonth || 12} this period
-            </div>
+            <div className="text-[10px] text-stone-500">In this workspace</div>
           </div>
           <div className="text-[10px] text-[#08415C] font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-            <span>View directory</span>
-            <ArrowRight className="w-3 h-3" />
+            <span>View contacts</span>
+            <ArrowRight className="w-2.5 h-2.5" />
           </div>
         </Link>
 
-        {/* Card 2: Today's Calling Sewa -> Click opens /calling-sewa */}
+        {/* Metric 2: Total Assigned Contacts */}
         <Link
           href="/calling-sewa"
-          className="gold-card p-3 sm:p-4 hover:border-[#D4AF37] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#D4AF37]"
-          title="Click to open Calling Sewa Desk"
+          className="gold-card p-3 sm:p-3.5 hover:border-[#00A896] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#00A896]"
+          title="Contacts assigned to volunteers"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-semibold text-[#78909C] uppercase tracking-wider truncate">
-              Calling Queue
+            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+              Assigned
             </span>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#FAF5E6] text-[#B8860B] flex items-center justify-center flex-shrink-0">
-              <PhoneCall className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <div className="w-6 h-6 rounded-lg bg-emerald-50 text-[#00A896] flex items-center justify-center flex-shrink-0">
+              <UserCheck className="w-3 h-3" />
             </div>
           </div>
-          <div className="my-1.5 sm:my-2">
-            <div className="text-2xl sm:text-3xl font-serif font-bold text-[#08415C]">
-              {currentStats.callsPending || 0} <span className="text-xs font-sans text-stone-500 font-normal">Due</span>
+          <div className="my-1.5">
+            <div className="text-xl sm:text-2xl font-serif font-bold text-[#00A896]">
+              {currentStats.totalAssignedContacts || 0}
             </div>
-            <div className="text-[10px] sm:text-xs text-stone-500">
-              {currentStats.callsCompleted || 0} calls completed
-            </div>
-          </div>
-          <div className="text-[10px] text-[#B8860B] font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-            <span>Open calling desk</span>
-            <ArrowRight className="w-3 h-3" />
-          </div>
-        </Link>
-
-        {/* Card 3: Courses & Batches -> Click opens /courses */}
-        <Link
-          href="/courses"
-          className="gold-card p-3 sm:p-4 hover:border-[#00A896] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#00A896]"
-          title="Click to view Courses & Batches"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-semibold text-[#78909C] uppercase tracking-wider truncate">
-              Course Students
-            </span>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-[#00A896] flex items-center justify-center flex-shrink-0">
-              <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </div>
-          </div>
-          <div className="my-1.5 sm:my-2">
-            <div className="text-2xl sm:text-3xl font-serif font-bold text-[#08415C]">
-              {currentStats.courseStudents || 0} <span className="text-xs font-sans text-stone-500 font-normal">Enrolled</span>
-            </div>
-            <div className="text-[10px] sm:text-xs text-stone-500">
-              {currentStats.activeCourses || 1} active courses
-            </div>
+            <div className="text-[10px] text-stone-500">Allocated callers</div>
           </div>
           <div className="text-[10px] text-[#00A896] font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-            <span>View courses</span>
-            <ArrowRight className="w-3 h-3" />
+            <span>Assign calls</span>
+            <ArrowRight className="w-2.5 h-2.5" />
           </div>
         </Link>
 
-        {/* Card 4: Attendance Matrix -> Click opens /attendance */}
+        {/* Metric 3: Total Pending Calls */}
         <Link
-          href="/attendance"
-          className="gold-card p-3 sm:p-4 hover:border-[#08415C] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#0B4F6C]"
-          title="Click to open Attendance Matrix"
+          href="/calling-sewa"
+          className="gold-card p-3 sm:p-3.5 hover:border-[#D4AF37] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#D4AF37]"
+          title="Total pending follow-up calls"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-semibold text-[#78909C] uppercase tracking-wider truncate">
-              Attendance Health
+            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+              Pending Calls
             </span>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0">
-              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <div className="w-6 h-6 rounded-lg bg-[#FAF5E6] text-[#B8860B] flex items-center justify-center flex-shrink-0">
+              <PhoneCall className="w-3 h-3" />
             </div>
           </div>
-          <div className="my-1.5 sm:my-2">
-            <div className="text-2xl sm:text-3xl font-serif font-bold text-emerald-800">
-              {currentStats.regularCount || 0} <span className="text-xs font-sans text-emerald-600 font-normal">Regular</span>
+          <div className="my-1.5">
+            <div className="text-xl sm:text-2xl font-serif font-bold text-[#08415C]">
+              {currentStats.totalPendingCalls ?? currentStats.callsPending ?? 0}
             </div>
-            <div className="text-[10px] sm:text-xs text-amber-700">
-              {currentStats.irregularCount || 0} need follow-up
+            <div className="text-[10px] text-stone-500">Calls due</div>
+          </div>
+          <div className="text-[10px] text-[#B8860B] font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+            <span>Calling desk</span>
+            <ArrowRight className="w-2.5 h-2.5" />
+          </div>
+        </Link>
+
+        {/* Metric 4: Today's Follow-ups */}
+        <Link
+          href="/todays-work"
+          className="gold-card p-3 sm:p-3.5 hover:border-indigo-600 transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-indigo-600"
+          title="Follow-ups due today"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+              Today's Calls
+            </span>
+            <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center flex-shrink-0">
+              <CheckSquare className="w-3 h-3" />
             </div>
+          </div>
+          <div className="my-1.5">
+            <div className="text-xl sm:text-2xl font-serif font-bold text-indigo-900">
+              {currentStats.todayFollowups || 0}
+            </div>
+            <div className="text-[10px] text-stone-500">Due today</div>
+          </div>
+          <div className="text-[10px] text-indigo-700 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+            <span>Today's work</span>
+            <ArrowRight className="w-2.5 h-2.5" />
+          </div>
+        </Link>
+
+        {/* Metric 5: Interested Devotees */}
+        <Link
+          href="/people?filter=interested"
+          className="gold-card p-3 sm:p-3.5 hover:border-amber-600 transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-amber-500"
+          title="Interested Devotees"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+              Interested
+            </span>
+            <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-3 h-3" />
+            </div>
+          </div>
+          <div className="my-1.5">
+            <div className="text-xl sm:text-2xl font-serif font-bold text-amber-700">
+              {currentStats.interestedDevotees || 0}
+            </div>
+            <div className="text-[10px] text-stone-500">Positive responses</div>
+          </div>
+          <div className="text-[10px] text-amber-700 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+            <span>View seekers</span>
+            <ArrowRight className="w-2.5 h-2.5" />
+          </div>
+        </Link>
+
+        {/* Metric 6: Registered Devotees */}
+        <Link
+          href="/courses"
+          className="gold-card p-3 sm:p-3.5 hover:border-[#08415C] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#08415C]"
+          title="Registered Devotees in course"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+              Registered
+            </span>
+            <div className="w-6 h-6 rounded-lg bg-[#08415C]/10 text-[#08415C] flex items-center justify-center flex-shrink-0">
+              <GraduationCap className="w-3 h-3" />
+            </div>
+          </div>
+          <div className="my-1.5">
+            <div className="text-xl sm:text-2xl font-serif font-bold text-[#08415C]">
+              {currentStats.registeredDevotees || 0}
+            </div>
+            <div className="text-[10px] text-stone-500">Enrolled devotees</div>
           </div>
           <div className="text-[10px] text-[#08415C] font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-            <span>Attendance grid</span>
-            <ArrowRight className="w-3 h-3" />
+            <span>Course roster</span>
+            <ArrowRight className="w-2.5 h-2.5" />
           </div>
         </Link>
       </div>
+
+      {/* STEP 4 PRD: BATCH-WISE PERFORMANCE & VOLUNTEER-WISE PERFORMANCE SECTIONS */}
+      {batchPerformance.length > 0 && (
+        <div className="gold-card p-4 sm:p-5 space-y-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5D8B8]/70 pb-3">
+            <div>
+              <h3 className="font-serif font-bold text-base sm:text-lg text-[#08415C] flex items-center gap-2">
+                <Layers className="w-4 h-4 text-[#00A896]" />
+                <span>Batch-Wise Performance (Step 4)</span>
+              </h3>
+              <p className="text-xs text-stone-500">
+                Performance indicators across batches in {activeCourseTitle}
+              </p>
+            </div>
+            <Link
+              href="/reports"
+              className="text-xs font-semibold text-[#08415C] hover:underline flex items-center gap-1"
+            >
+              <span>View full reports</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {batchPerformance.map((batch: any) => (
+              <div
+                key={batch.id}
+                className="p-3.5 rounded-xl bg-white border border-[#E5D8B8] shadow-2xs hover:shadow-sm transition"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <h4 className="font-bold text-xs sm:text-sm text-[#08415C] truncate">
+                    {batch.batchName}
+                  </h4>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    {batch.attendanceRate}% Attendance
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-500 mb-3">{batch.scheduleInfo || "Weekly Schedule"}</p>
+
+                <div className="grid grid-cols-3 gap-2 text-center text-xs pt-2 border-t border-stone-100">
+                  <div className="p-1 rounded bg-stone-50">
+                    <span className="text-[10px] text-stone-500 block">Enrolled</span>
+                    <span className="font-bold text-stone-800">{batch.enrolledCount}</span>
+                  </div>
+                  <div className="p-1 rounded bg-emerald-50/50">
+                    <span className="text-[10px] text-emerald-700 block">Completed</span>
+                    <span className="font-bold text-emerald-800">{batch.completedCalls}</span>
+                  </div>
+                  <div className="p-1 rounded bg-amber-50/50">
+                    <span className="text-[10px] text-amber-700 block">Pending</span>
+                    <span className="font-bold text-amber-800">{batch.pendingCalls}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* VOLUNTEER-WISE PERFORMANCE SECTION (PRD STEP 4) */}
+      {volunteerPerformance.length > 0 && (
+        <div className="gold-card p-4 sm:p-5 space-y-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5D8B8]/70 pb-3">
+            <div>
+              <h3 className="font-serif font-bold text-base sm:text-lg text-[#08415C] flex items-center gap-2">
+                <Users className="w-4 h-4 text-[#D4AF37]" />
+                <span>Volunteer-Wise Performance (Step 4)</span>
+              </h3>
+              <p className="text-xs text-stone-500">
+                Calling output, assigned contacts, and positive responses per volunteer
+              </p>
+            </div>
+            <Link
+              href="/volunteers"
+              className="text-xs font-semibold text-[#08415C] hover:underline flex items-center gap-1"
+            >
+              <span>Manage volunteers</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#FAF8F5] text-stone-600 font-semibold border-b border-[#E5D8B8]">
+                <tr>
+                  <th className="py-2.5 px-3">Volunteer</th>
+                  <th className="py-2.5 px-3">Role</th>
+                  <th className="py-2.5 px-3 text-center">Assigned Contacts</th>
+                  <th className="py-2.5 px-3 text-center">Calls Made</th>
+                  <th className="py-2.5 px-3 text-center">Pending Calls</th>
+                  <th className="py-2.5 px-3 text-center">Interested / Will Attend</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {volunteerPerformance.map((v: any) => (
+                  <tr key={v.id} className="hover:bg-stone-50 transition">
+                    <td className="py-2.5 px-3 font-semibold text-stone-900">{v.name}</td>
+                    <td className="py-2.5 px-3 text-stone-500 text-[11px]">{v.role?.replace(/_/g, " ")}</td>
+                    <td className="py-2.5 px-3 text-center font-bold text-stone-800">{v.assignedCount}</td>
+                    <td className="py-2.5 px-3 text-center font-bold text-emerald-700">{v.completedCalls}</td>
+                    <td className="py-2.5 px-3 text-center font-bold text-amber-700">{v.pendingCalls}</td>
+                    <td className="py-2.5 px-3 text-center font-bold text-[#08415C]">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800">
+                        {v.positiveResponses} Devotees
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Operational Sections: Left Queue (Priority Calls) + Right Activity Feed */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
@@ -254,197 +487,117 @@ export default function DashboardPage() {
                       : "text-stone-600 hover:bg-white"
                   }`}
                 >
-                  Callbacks
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveQueueTab("absentee")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] transition ${
-                    activeQueueTab === "absentee"
-                      ? "bg-[#08415C] text-white font-semibold shadow-xs"
-                      : "text-stone-600 hover:bg-white"
-                  }`}
-                >
-                  Absentee
+                  Follow-ups
                 </button>
               </div>
             </div>
 
-            {/* Devotee Cards List */}
-            <div className="space-y-2 sm:space-y-3">
-              {currentStats.priorityCalls && currentStats.priorityCalls.length > 0 ? (
-                currentStats.priorityCalls.map((person: any) => (
+            {/* Calling Cards List */}
+            <div className="space-y-2.5">
+              {(currentStats.priorityCalls || []).map((person: any) => (
+                <div
+                  key={person.id}
+                  className="p-3 sm:p-3.5 rounded-xl border border-[#E5D8B8]/80 bg-white/70 hover:bg-white transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs hover:shadow-xs group"
+                >
                   <div
-                    key={person.id}
-                    className="p-3 bg-white border border-[#E5D8B8] rounded-xl hover:border-[#D4AF37] transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 group shadow-xs"
+                    className="flex-1 cursor-pointer"
+                    onClick={() => openPersonModal(person.id)}
                   >
-                    <div
-                      className="cursor-pointer flex-1 min-w-0"
-                      onClick={() => openPersonModal(person.id)}
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-serif font-bold text-xs sm:text-sm text-[#08415C] group-hover:text-[#0B4F6C]">
-                          {person.fullName}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-[#0B192C] group-hover:text-[#08415C]">
+                        {person.fullName}
+                      </span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FAF5E6] text-[#B8860B] border border-[#E5D8B8]">
+                        {person.stage || "New Seeker"}
+                      </span>
+                      {person.assignedVolunteer && (
+                        <span className="text-[10px] text-stone-500 bg-stone-100 px-1.5 py-0.2 rounded">
+                          Caller: {person.assignedVolunteer.name}
                         </span>
-                        <Badge variant="morpankh" size="sm">{person.stage}</Badge>
-                        {person.area && (
-                          <span className="text-[10px] text-stone-500 flex items-center gap-0.5">
-                            <MapPin className="w-3 h-3 text-[#D4AF37]" /> {person.area}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-stone-600 mt-0.5 line-clamp-1">
-                        {person.mobile} • {person.notes || `Assigned: ${person.assignedVolunteer?.name || "Caller"}`}
-                      </p>
+                      )}
                     </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-                      <button
-                        onClick={() => openCallModal(person)}
-                        className="px-2.5 py-1.5 bg-[#00A896] hover:bg-[#028090] text-white text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1 transition"
-                        title="Click to Dial"
-                      >
-                        <PhoneCall className="w-3.5 h-3.5" /> <span>Call</span>
-                      </button>
-                      <button
-                        onClick={() => openWhatsAppModal(person)}
-                        className="px-2.5 py-1.5 bg-[#08415C] hover:bg-[#0B4F6C] text-white text-xs font-semibold rounded-lg border border-[#D4AF37]/50 shadow-xs flex items-center gap-1 transition"
-                        title="Send WhatsApp Template"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 text-[#D4AF37]" /> <span>WhatsApp</span>
-                      </button>
+                    <div className="flex items-center gap-3 text-xs text-stone-500 mt-1">
+                      <span>📱 {person.mobile}</span>
+                      {person.area && (
+                        <span className="flex items-center gap-0.5">
+                          <MapPin className="w-3 h-3 text-stone-400" />
+                          {person.area}
+                        </span>
+                      )}
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="p-6 text-center text-xs text-stone-500">
-                  All calling queue tasks completed! Haribol!
+
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => openWhatsAppModal(person)}
+                      className="p-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition border border-emerald-200"
+                      title="Send WhatsApp Message"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openCallModal(person)}
+                      className="px-3 py-1.5 rounded-lg bg-[#08415C] text-white hover:bg-[#063349] transition text-xs font-semibold flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <PhoneCall className="w-3.5 h-3.5" />
+                      <span>Call</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {(!currentStats.priorityCalls || currentStats.priorityCalls.length === 0) && (
+                <div className="p-8 text-center text-stone-400 text-xs">
+                  No pending calls in this cohort right now.
                 </div>
               )}
-            </div>
-
-            <div className="pt-2 flex items-center justify-between text-xs text-stone-500">
-              <span>Showing priority items</span>
-              <Link
-                href="/calling-sewa"
-                className="font-semibold text-[#08415C] hover:text-[#B8860B] flex items-center gap-1"
-              >
-                <span>Full Calling & Follow-up Desk</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
             </div>
           </div>
         </div>
 
-        {/* Right Column (5 Cols): Course Batch Attendance Summary & Live Activity */}
+        {/* Right Column (5 Cols): Recent Seva Activity Stream */}
         <div className="lg:col-span-5 space-y-4">
-          {/* Active Course Regularity Card -> Clickable to /attendance */}
-          <Link
-            href="/attendance"
-            className="gold-card p-3.5 sm:p-4 space-y-2.5 block hover:border-[#08415C] transition shadow-xs group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-[#08415C] uppercase tracking-wider flex items-center gap-1">
-                <GraduationCap className="w-3.5 h-3.5 text-[#08415C]" /> Batch Attendance Overview
-              </span>
-              <Badge variant="morpankh" size="sm">Gita Shiksha</Badge>
-            </div>
-
-            <h4 className="font-serif font-bold text-sm sm:text-base text-[#08415C]">
-              Batch Regularity Breakdown
-            </h4>
-
-            <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1">
-              <div className="p-2 bg-emerald-50 border border-emerald-300 rounded-lg">
-                <div className="font-bold text-emerald-800 text-sm sm:text-base">{currentStats.regularCount || 38}</div>
-                <div className="text-[10px] text-emerald-700">Regular (≥75%)</div>
-              </div>
-              <div className="p-2 bg-amber-50 border border-amber-300 rounded-lg">
-                <div className="font-bold text-amber-800 text-sm sm:text-base">{currentStats.irregularCount || 7}</div>
-                <div className="text-[10px] text-amber-700">Irregular (50-74%)</div>
-              </div>
-              <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg">
-                <div className="font-bold text-rose-800 text-sm sm:text-base">{currentStats.lowCount || 3}</div>
-                <div className="text-[10px] text-rose-700">Low (&lt;50%)</div>
+          <div className="gold-card p-3.5 sm:p-5 space-y-3.5 sm:space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E5D8B8]/70 pb-3">
+              <div>
+                <h3 className="font-serif font-bold text-base sm:text-lg text-[#08415C] flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-[#D4AF37]" />
+                  Recent Seva Activity
+                </h3>
+                <p className="text-[11px] sm:text-xs text-[#78909C]">
+                  Live feed: who performed each seva
+                </p>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-[#E5D8B8]/60 flex items-center justify-between text-xs text-[#08415C] font-semibold">
-              <span>Open Attendance Matrix</span>
-              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
-
-          {/* Live Seva Activity Stream */}
-          <div className="gold-card p-3.5 sm:p-4 space-y-3 shadow-xs">
-            <div className="flex items-center justify-between border-b border-[#E5D8B8]/60 pb-2">
-              <h4 className="font-serif font-bold text-xs sm:text-sm text-[#08415C] flex items-center gap-1.5">
-                <Flame className="w-4 h-4 text-[#D9480F]" /> Recent Seva Activity Stream
-              </h4>
-              <span className="text-[10px] text-stone-500 font-medium">Live Actions</span>
-            </div>
-
-            <div className="space-y-2 text-xs max-h-80 overflow-y-auto divide-y divide-stone-100">
-              {currentStats.recentTimeline && currentStats.recentTimeline.length > 0 ? (
-                currentStats.recentTimeline.map((item: any) => {
-                  const eventType = item.eventType || "";
-                  const title = item.title || "";
-                  const actor = item.createdByUser?.name || "Sevak";
-                  const personName = item.person?.fullName || "Devotee";
-
-                  let icon = "🪷";
-                  let actionText = "";
-                  let badgeColor = "bg-stone-100 text-stone-700";
-
-                  if (title.includes("Registered") || title.includes("Profile") || eventType === "NOTE") {
-                    icon = "👤";
-                    actionText = `${actor} added new member ${personName}`;
-                    badgeColor = "bg-blue-50 text-blue-800 border border-blue-200";
-                  } else if (title.includes("Assigned") || title.includes("Allocation")) {
-                    icon = "📋";
-                    actionText = `${actor} assigned calling seva for ${personName}`;
-                    badgeColor = "bg-purple-50 text-purple-800 border border-purple-200";
-                  } else if (title.includes("CALL") || eventType === "CALL") {
-                    icon = "📞";
-                    actionText = `${actor} completed call with ${personName}`;
-                    badgeColor = "bg-emerald-50 text-emerald-800 border border-emerald-200";
-                  } else if (title.includes("ABSENT") || (item.description && item.description.includes("ABSENT"))) {
-                    icon = "❌";
-                    actionText = `${actor} marked ${personName} absent`;
-                    badgeColor = "bg-rose-50 text-rose-800 border border-rose-200";
-                  } else if (title.includes("Course") || eventType === "COURSE_SESSION") {
-                    icon = "🎓";
-                    actionText = `${actor} registered / updated ${personName}`;
-                    badgeColor = "bg-amber-50 text-amber-800 border border-amber-200";
-                  } else {
-                    icon = "✨";
-                    actionText = `${actor}: ${title} for ${personName}`;
-                    badgeColor = "bg-stone-50 text-stone-700 border border-stone-200";
-                  }
-
-                  return (
-                    <div key={item.id} className="pt-2 first:pt-0 space-y-1">
-                      <div className="flex items-center justify-between text-[11px] gap-2">
-                        <span className={`px-1.5 py-0.2 rounded-md font-bold text-[10px] flex items-center gap-1 ${badgeColor}`}>
-                          <span>{icon}</span>
-                          <span>{actionText}</span>
-                        </span>
-                        <span className="text-[10px] text-stone-400 whitespace-nowrap">
-                          {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-                      {item.description && (
-                        <p className="text-[10px] text-stone-600 italic line-clamp-1 pl-1">
-                          &quot;{item.description}&quot;
-                        </p>
-                      )}
+            <div className="space-y-3">
+              {(currentStats.recentTimeline || []).map((event: any) => (
+                <div key={event.id} className="flex items-start gap-2.5 text-xs">
+                  <div className="w-2 h-2 rounded-full bg-[#D4AF37] mt-1.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-stone-800">
+                      {event.createdByUser?.name ? (
+                        <strong className="text-[#08415C]">{event.createdByUser.name} </strong>
+                      ) : null}
+                      <span>{event.title}</span>
                     </div>
-                  );
-                })
-              ) : (
-                <div className="p-4 text-center text-xs text-stone-500">
-                  No recent activities recorded today.
+                    {event.person && (
+                      <div className="text-[11px] text-stone-500">
+                        Devotee: <strong>{event.person.fullName}</strong> ({event.person.mobile})
+                      </div>
+                    )}
+                    <span className="text-[10px] text-stone-400">
+                      {new Date(event.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              {(!currentStats.recentTimeline || currentStats.recentTimeline.length === 0) && (
+                <div className="p-8 text-center text-stone-400 text-xs">
+                  No seva activity logged yet today.
                 </div>
               )}
             </div>

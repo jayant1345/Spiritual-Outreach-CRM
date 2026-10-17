@@ -10,7 +10,7 @@ export interface AuthUser {
   email: string;
   username?: string | null;
   phone?: string | null;
-  role: "SUPER_ADMIN" | "COORDINATOR" | "CALLING_VOLUNTEER" | "RELATIONSHIP_VOLUNTEER";
+  role: "SUPER_ADMIN" | "ADMIN" | "TEAM_LEADER" | "COORDINATOR" | "CALLING_VOLUNTEER" | "RELATIONSHIP_VOLUNTEER";
   avatar?: string | null;
   privileges?: string[] | null;
   permissions?: PermissionKey[];
@@ -22,6 +22,7 @@ interface AuthContextType {
   login: (identifier: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   isAdmin: boolean;
+  isTeamLeader: boolean;
   isCoordinator: boolean;
   isCallingVolunteer: boolean;
   isRelationshipVolunteer: boolean;
@@ -117,7 +118,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      router.push("/");
+      // Role-based post-login journey as per PRD:
+      if (data.user.role === "CALLING_VOLUNTEER") {
+        // Calling Volunteer Journey: Direct to My Calling Dashboard
+        router.push("/calling-sewa");
+      } else {
+        // Admin, Team Leader, Coordinator Journey: Step 2 & Step 3 Select Course & Batch
+        router.push("/select-batch");
+      }
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || "Login connection failed" };
@@ -139,8 +148,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const isAdmin = user?.role === "SUPER_ADMIN";
-  const isCoordinator = user?.role === "COORDINATOR" || isAdmin;
+  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
+  const isTeamLeader = user?.role === "TEAM_LEADER";
+  const isCoordinator = user?.role === "COORDINATOR" || isTeamLeader || isAdmin;
   const isCallingVolunteer = user?.role === "CALLING_VOLUNTEER";
   const isRelationshipVolunteer = user?.role === "RELATIONSHIP_VOLUNTEER";
 
@@ -200,6 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         isAdmin,
+        isTeamLeader,
         isCoordinator,
         isCallingVolunteer,
         isRelationshipVolunteer,
