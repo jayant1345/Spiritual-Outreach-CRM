@@ -17,6 +17,8 @@ import {
   Calendar,
   X,
   ExternalLink,
+  GraduationCap,
+  Layers,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { CRMContext } from "./RootShell";
@@ -39,6 +41,23 @@ export const Header: React.FC<HeaderProps> = ({
 
   const [activeCenter] = useState("Chandkheda Center");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Course & Batch Switcher State (Admin / Team Leader / Coordinator)
+  const [headerCourses, setHeaderCourses] = useState<any[]>([]);
+  const [activeCourseId, setActiveCourseId] = useState<string>("ALL");
+  const [activeBatchId, setActiveBatchId] = useState<string>("ALL");
+
+  useEffect(() => {
+    fetch("/api/courses")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setHeaderCourses(data);
+      })
+      .catch((e) => console.error("Error fetching courses for header:", e));
+  }, []);
+
+  const selectedCourse = headerCourses.find((c: any) => c.id === activeCourseId);
+  const activeCourseBatches = selectedCourse?.batches || [];
 
   // Search Bar State
   const [query, setQuery] = useState("");
@@ -154,6 +173,8 @@ export const Header: React.FC<HeaderProps> = ({
     switch (role) {
       case "SUPER_ADMIN":
         return { label: "Admin", bg: "bg-[#08415C]", text: "text-white", border: "border-[#D4AF37]" };
+      case "TEAM_LEADER":
+        return { label: "Team Leader", bg: "bg-teal-700", text: "text-white", border: "border-teal-500" };
       case "COORDINATOR":
         return { label: "Coordinator", bg: "bg-emerald-700", text: "text-white", border: "border-emerald-500" };
       case "CALLING_VOLUNTEER":
@@ -182,6 +203,60 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       )}
 
+      {/* Course & Batch Quick Switcher (Replaces static text with Course & Batch Switcher) */}
+      <div className="hidden xl:flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold text-[#08415C] shadow-2xs">
+          <GraduationCap className="w-3.5 h-3.5 text-[#D4AF37]" />
+          <span className="text-stone-400 font-normal">Course:</span>
+          <select
+            value={activeCourseId}
+            onChange={(e) => {
+              const cId = e.target.value;
+              setActiveCourseId(cId);
+              setActiveBatchId("ALL");
+              if (cId !== "ALL") {
+                router.push(`/courses/${cId}`);
+              } else {
+                router.push(`/courses`);
+              }
+            }}
+            className="bg-transparent text-[#08415C] font-bold outline-none cursor-pointer text-xs max-w-[140px] truncate"
+          >
+            <option value="ALL">All Courses</option>
+            {headerCourses.map((c: any) => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold text-[#08415C] shadow-2xs">
+          <Layers className="w-3.5 h-3.5 text-[#00A896]" />
+          <span className="text-stone-400 font-normal">Batch:</span>
+          <select
+            value={activeBatchId}
+            onChange={(e) => {
+              const bId = e.target.value;
+              setActiveBatchId(bId);
+              const selCourse = headerCourses.find((c: any) => c.id === activeCourseId);
+              const selBatch = selCourse?.batches?.find((b: any) => b.id === bId);
+              if (selBatch) {
+                router.push(`/calling-sewa?batch=${encodeURIComponent(selBatch.batchName)}`);
+              }
+            }}
+            className="bg-transparent text-[#08415C] font-bold outline-none cursor-pointer text-xs max-w-[120px] truncate"
+          >
+            <option value="ALL">All Batches</option>
+            {activeCourseBatches.map((b: any) => (
+              <option key={b.id} value={b.id}>
+                {b.batchName}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Active Global Search Bar */}
       <div ref={searchRef} className="flex-1 max-w-xl relative min-w-0">
         <Search className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#78909C]" />
@@ -198,7 +273,7 @@ export const Header: React.FC<HeaderProps> = ({
               router.push(`/people?query=${encodeURIComponent(query.trim())}`);
             }
           }}
-          placeholder="Search Members, Phone, Locality..."
+          placeholder="Search by Name, Phone, Locality, Course, Batch, Caller..."
           className="w-full pl-8 sm:pl-10 pr-7 sm:pr-8 py-2 bg-white border border-[#E5D8B8] rounded-xl text-xs sm:text-sm text-[#0B192C] placeholder-[#78909C] focus:outline-none focus:ring-2 focus:ring-[#08415C]/20 focus:border-[#08415C] shadow-xs transition"
         />
         {query && (

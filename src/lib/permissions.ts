@@ -1,5 +1,7 @@
 export type UserRole =
   | "SUPER_ADMIN"
+  | "ADMIN"
+  | "TEAM_LEADER"
   | "COORDINATOR"
   | "CALLING_VOLUNTEER"
   | "RELATIONSHIP_VOLUNTEER";
@@ -152,15 +154,27 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
 export const ROLE_HIERARCHY: Record<UserRole, { title: string; tier: number; badgeColor: string; description: string }> = {
   SUPER_ADMIN: {
     title: "Super Admin (Temple President / Management)",
-    tier: 4,
+    tier: 5,
     badgeColor: "bg-[#08415C] text-white border-[#D4AF37]",
     description: "Unrestricted master access. Full view, add, edit, delete, export, and user role configuration across the entire CRM.",
   },
+  ADMIN: {
+    title: "Admin (Center Admin / Manager)",
+    tier: 4,
+    badgeColor: "bg-[#08415C] text-white border-[#D4AF37]",
+    description: "Full administrative access across courses, batches, calling, devotees, and reports.",
+  },
+  TEAM_LEADER: {
+    title: "Team Leader (Batch / Course Lead)",
+    tier: 3,
+    badgeColor: "bg-indigo-700 text-white border-indigo-400",
+    description: "Manages assigned courses and batches, assigns calls to volunteers, and monitors batch performance reports.",
+  },
   COORDINATOR: {
     title: "Coordinator (Department Head / Team Lead)",
-    tier: 3,
+    tier: 2,
     badgeColor: "bg-emerald-700 text-white border-emerald-500",
-    description: "Operational leadership. Can view all devotees, assign callers, manage courses & events, export data, and manage volunteers.",
+    description: "Operational leadership. Can view devotees, assign callers, manage courses & events, export data, and manage volunteers.",
   },
   RELATIONSHIP_VOLUNTEER: {
     title: "Relationship Volunteer (Devotee Counselor / Mentor)",
@@ -178,6 +192,22 @@ export const ROLE_HIERARCHY: Record<UserRole, { title: string; tier: number; bad
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, PermissionKey[]> = {
   SUPER_ADMIN: PERMISSION_DEFINITIONS.map((p) => p.key),
+  ADMIN: PERMISSION_DEFINITIONS.map((p) => p.key),
+  TEAM_LEADER: [
+    "devotees:view_all",
+    "devotees:create",
+    "devotees:edit",
+    "devotees:export",
+    "calling:view",
+    "calling:log",
+    "calling:assign",
+    "whatsapp:send",
+    "whatsapp:manage",
+    "courses:manage",
+    "programs:manage",
+    "reports:view",
+    "reports:export",
+  ],
   COORDINATOR: [
     "devotees:view_all",
     "devotees:create",
@@ -230,7 +260,7 @@ export function hasPermission(
   permission: PermissionKey
 ): boolean {
   if (!user || !user.role) return false;
-  if (user.role === "SUPER_ADMIN") return true;
+  if (user.role === "SUPER_ADMIN" || user.role === "ADMIN") return true;
 
   const perms = getEffectivePermissions(user.role, user.privileges);
   return perms.includes(permission);

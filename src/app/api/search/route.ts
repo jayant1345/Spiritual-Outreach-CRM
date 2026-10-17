@@ -21,6 +21,9 @@ export async function GET(request: Request) {
         { mobile: { contains: q } },
         { email: { contains: q } },
         { area: { contains: q } },
+        { assignedVolunteer: { name: { contains: q } } },
+        { courseEnrollments: { some: { course: { title: { contains: q } } } } },
+        { courseEnrollments: { some: { batch: { batchName: { contains: q } } } } },
       ],
     };
 
@@ -35,7 +38,7 @@ export async function GET(request: Request) {
 
     const members = await prisma.person.findMany({
       where,
-      take: 8,
+      take: 10,
       select: {
         id: true,
         fullName: true,
@@ -44,6 +47,13 @@ export async function GET(request: Request) {
         stage: true,
         profession: true,
         assignedVolunteer: { select: { name: true } },
+        courseEnrollments: {
+          take: 1,
+          select: {
+            course: { select: { title: true } },
+            batch: { select: { batchName: true } },
+          },
+        },
       },
       orderBy: { fullName: "asc" },
     });

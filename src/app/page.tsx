@@ -377,20 +377,76 @@ export default function DashboardPage() {
           </Link>
 
           {/* Live Seva Activity Stream */}
-          <div className="gold-card p-3.5 sm:p-4 space-y-2.5 shadow-xs">
-            <h4 className="font-serif font-bold text-xs sm:text-sm text-[#08415C] flex items-center gap-1.5">
-              <Flame className="w-4 h-4 text-[#D9480F]" /> Recent Seva Activity Stream
-            </h4>
-            <div className="space-y-2 text-xs">
-              {currentStats.recentTimeline && currentStats.recentTimeline.slice(0, 4).map((item: any) => (
-                <div key={item.id} className="p-2 bg-[#FAF8F5] border border-[#E5D8B8] rounded-lg">
-                  <div className="flex items-center justify-between text-[11px] text-[#78909C]">
-                    <span className="font-semibold text-[#08415C]">{item.person?.fullName}</span>
-                    <span>{new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                  <p className="text-[11px] text-stone-700 mt-0.5 line-clamp-1">{item.title}</p>
+          <div className="gold-card p-3.5 sm:p-4 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between border-b border-[#E5D8B8]/60 pb-2">
+              <h4 className="font-serif font-bold text-xs sm:text-sm text-[#08415C] flex items-center gap-1.5">
+                <Flame className="w-4 h-4 text-[#D9480F]" /> Recent Seva Activity Stream
+              </h4>
+              <span className="text-[10px] text-stone-500 font-medium">Live Actions</span>
+            </div>
+
+            <div className="space-y-2 text-xs max-h-80 overflow-y-auto divide-y divide-stone-100">
+              {currentStats.recentTimeline && currentStats.recentTimeline.length > 0 ? (
+                currentStats.recentTimeline.map((item: any) => {
+                  const eventType = item.eventType || "";
+                  const title = item.title || "";
+                  const actor = item.createdByUser?.name || "Sevak";
+                  const personName = item.person?.fullName || "Devotee";
+
+                  let icon = "🪷";
+                  let actionText = "";
+                  let badgeColor = "bg-stone-100 text-stone-700";
+
+                  if (title.includes("Registered") || title.includes("Profile") || eventType === "NOTE") {
+                    icon = "👤";
+                    actionText = `${actor} added new member ${personName}`;
+                    badgeColor = "bg-blue-50 text-blue-800 border border-blue-200";
+                  } else if (title.includes("Assigned") || title.includes("Allocation")) {
+                    icon = "📋";
+                    actionText = `${actor} assigned calling seva for ${personName}`;
+                    badgeColor = "bg-purple-50 text-purple-800 border border-purple-200";
+                  } else if (title.includes("CALL") || eventType === "CALL") {
+                    icon = "📞";
+                    actionText = `${actor} completed call with ${personName}`;
+                    badgeColor = "bg-emerald-50 text-emerald-800 border border-emerald-200";
+                  } else if (title.includes("ABSENT") || (item.description && item.description.includes("ABSENT"))) {
+                    icon = "❌";
+                    actionText = `${actor} marked ${personName} absent`;
+                    badgeColor = "bg-rose-50 text-rose-800 border border-rose-200";
+                  } else if (title.includes("Course") || eventType === "COURSE_SESSION") {
+                    icon = "🎓";
+                    actionText = `${actor} registered / updated ${personName}`;
+                    badgeColor = "bg-amber-50 text-amber-800 border border-amber-200";
+                  } else {
+                    icon = "✨";
+                    actionText = `${actor}: ${title} for ${personName}`;
+                    badgeColor = "bg-stone-50 text-stone-700 border border-stone-200";
+                  }
+
+                  return (
+                    <div key={item.id} className="pt-2 first:pt-0 space-y-1">
+                      <div className="flex items-center justify-between text-[11px] gap-2">
+                        <span className={`px-1.5 py-0.2 rounded-md font-bold text-[10px] flex items-center gap-1 ${badgeColor}`}>
+                          <span>{icon}</span>
+                          <span>{actionText}</span>
+                        </span>
+                        <span className="text-[10px] text-stone-400 whitespace-nowrap">
+                          {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                      {item.description && (
+                        <p className="text-[10px] text-stone-600 italic line-clamp-1 pl-1">
+                          &quot;{item.description}&quot;
+                        </p>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-4 text-center text-xs text-stone-500">
+                  No recent activities recorded today.
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
