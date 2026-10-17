@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getOutcomeConfig } from "@/components/calling/CallActionModal";
+import AssignMultipleModal from "@/components/calling/AssignMultipleModal";
 
 export default function CallingSewaPage() {
   const { openPersonModal, openCallModal, openWhatsAppModal, refreshTrigger } = useContext(CRMContext);
@@ -35,6 +36,10 @@ export default function CallingSewaPage() {
   const [callLogs, setCallLogs] = useState<any[]>([]);
   const [followups, setFollowups] = useState<any[]>([]);
   const [volunteers, setVolunteers] = useState<any[]>([]);
+
+  // Multi-select for assigning calls
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isAssignMultipleOpen, setIsAssignMultipleOpen] = useState(false);
 
   // Requirement: Show only the logged-in user's data by default, with option to view other users' data
   const [showOtherUsers, setShowOtherUsers] = useState<boolean>(false);
@@ -215,6 +220,21 @@ export default function CallingSewaPage() {
   const completedCallsCount = people.filter((p) => !!getLatestCallForPerson(p)).length;
   const pendingCallsCount = people.length - completedCallsCount;
 
+  const handleSelectAll = () => {
+    if (filteredPeople.length > 0 && selectedIds.length === filteredPeople.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredPeople.map((p) => p.id));
+    }
+  };
+
+  const toggleSelectPerson = (id: string, e: React.MouseEvent | React.ChangeEvent) => {
+    e.stopPropagation();
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Top Header */}
@@ -231,8 +251,37 @@ export default function CallingSewaPage() {
           </p>
         </div>
 
-        {/* View Mode Switcher: My Data (Default) vs Other Users' Data */}
+        {/* View Mode Switcher: My Data (Default) vs Other Users' Data + Assign Multiple Button */}
         <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+          {/* Assign Multiple Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (selectedIds.length === 0) {
+                const pendingIds = filteredPeople.filter((p) => !getLatestCallForPerson(p)).map((p) => p.id);
+                if (pendingIds.length > 0) {
+                  setSelectedIds(pendingIds);
+                  setIsAssignMultipleOpen(true);
+                } else if (filteredPeople.length > 0) {
+                  setSelectedIds(filteredPeople.map((p) => p.id));
+                  setIsAssignMultipleOpen(true);
+                } else {
+                  alert("No devotees available to assign.");
+                }
+              } else {
+                setIsAssignMultipleOpen(true);
+              }
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition ${
+              selectedIds.length > 0
+                ? "bg-[#08415C] text-white border border-[#D4AF37]/50 shadow-gold"
+                : "bg-white hover:bg-stone-50 border border-[#E5D8B8] text-[#08415C]"
+            }`}
+            title="Assign selected devotees to one or multiple volunteers"
+          >
+            <UserCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
+            <span>Assign Multiple {selectedIds.length > 0 ? `(${selectedIds.length})` : ""}</span>
+          </button>
           {!showOtherUsers ? (
             <button
               type="button"
@@ -551,9 +600,31 @@ export default function CallingSewaPage() {
         <div className="gold-card p-3.5 sm:p-5 space-y-3.5 shadow-xs">
           {/* Section Sub-header & Filter Pills */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs text-stone-500 pb-2 border-b border-stone-100 gap-2">
-            <div>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Select All Checkbox */}
+              <label className="flex items-center gap-1.5 cursor-pointer font-bold text-stone-700 select-none py-1 px-2 rounded-lg hover:bg-stone-100 transition">
+                <input
+                  type="checkbox"
+                  checked={filteredPeople.length > 0 && selectedIds.length === filteredPeople.length}
+                  onChange={handleSelectAll}
+                  className="w-4 h-4 rounded accent-[#08415C] cursor-pointer"
+                />
+                <span>Select All ({filteredPeople.length})</span>
+              </label>
+
+              {selectedIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsAssignMultipleOpen(true)}
+                  className="px-2.5 py-1 bg-[#08415C] hover:bg-[#063349] text-white font-bold rounded-lg shadow-xs flex items-center gap-1 transition"
+                >
+                  <UserCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>Assign {selectedIds.length} Selected ➔</span>
+                </button>
+              )}
+
               <span>
-                Showing <strong>{filteredPeople.length}</strong> of <strong>{people.length}</strong> devotees to call
+                Showing <strong>{filteredPeople.length}</strong> of <strong>{people.length}</strong> devotees
                 {activeVolunteerId !== "ALL" && selectedVolunteerObj && (
                   <span className="font-semibold text-[#08415C]">
                     {" "}allocated to {selectedVolunteerObj.name}
@@ -659,6 +730,20 @@ export default function CallingSewaPage() {
                         : "bg-white border-[#E5D8B8] hover:border-[#D4AF37]"
                     }`}
                   >
+                    {/* Bulk Selection Checkbox */}
+                    <div
+                      className="flex items-center self-start sm:self-center pr-1 flex-shrink-0 pt-0.5 sm:pt-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(person.id)}
+                        onChange={(e) => toggleSelectPerson(person.id, e)}
+                        className="w-4 h-4 rounded accent-[#08415C] cursor-pointer"
+                        title="Select for bulk assignment"
+                      />
+                    </div>
+
                     {/* Left: Devotee Info & Completed Response Display */}
                     <div
                       className="cursor-pointer flex-1 min-w-0"
@@ -1026,6 +1111,44 @@ export default function CallingSewaPage() {
           </div>
         </div>
       )}
+
+      {/* Sticky Bottom Action Bar for Bulk Assignment */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-20 sm:bottom-6 left-3 right-3 sm:left-auto sm:right-6 sm:max-w-md bg-[#08415C] text-white p-3.5 rounded-2xl shadow-2xl border border-[#D4AF37]/60 flex items-center justify-between gap-3 z-40 animate-slideUp">
+          <div className="text-xs">
+            <span className="font-bold text-[#D4AF37] text-sm">{selectedIds.length}</span> devotees selected
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="px-2.5 py-1 text-xs text-stone-300 hover:text-white transition"
+            >
+              Deselect
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAssignMultipleOpen(true)}
+              className="px-3.5 py-1.5 bg-[#D4AF37] hover:bg-[#c49f27] text-[#08415C] font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition"
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Assign Calls</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Multiple Calls Modal */}
+      <AssignMultipleModal
+        isOpen={isAssignMultipleOpen}
+        onClose={() => setIsAssignMultipleOpen(false)}
+        selectedIds={selectedIds}
+        volunteers={volunteers}
+        onSuccess={() => {
+          setSelectedIds([]);
+          fetchData();
+        }}
+      />
     </div>
   );
 }

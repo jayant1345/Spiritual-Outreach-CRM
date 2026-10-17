@@ -17,15 +17,57 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No members selected" }, { status: 400 });
     }
 
-    if (action === "ASSIGN_VOLUNTEER") {
+    if (action === "ASSIGN_VOLUNTEER" || action === "ASSIGN_CALLS") {
       if (!hasPermission(currentUser, "calling:assign")) {
         return NextResponse.json({ error: "Permission denied to assign calling persons." }, { status: 403 });
       }
 
+      const volunteerId = value || body.volunteerId;
+      const priority = body.priority || "NORMAL";
+      const note = body.note || body.remarks || "";
+      const sendNotification = body.sendNotification !== false;
+
       await prisma.person.updateMany({
         where: { id: { in: ids } },
-        data: { assignedVolunteerId: value || null },
+        data: { assignedVolunteerId: volunteerId || null },
       });
+
+      // If a volunteer was assigned and tasks/notifications are enabled:
+      if (volunteerId && sendNotification) {
+        const targetVol = await prisma.user.findUnique({
+          where: { id: volunteerId },
+          select: { id: true, name: true },
+        });
+
+        const now = new Date();
+        const taskCreations = ids.map((pId: string) =>
+          prisma.followupTask.create({
+            data: {
+              personId: pId,
+              volunteerId: volunteerId,
+              type: "Calling",
+              status: "PENDING",
+              priority: priority === "URGENT" ? "URGENT" : priority === "HIGH" ? "HIGH" : "MEDIUM",
+              remarks: note ? `Calling assignment: ${note}` : `New call assigned by ${currentUser.name}`,
+              dueDate: now,
+            },
+          })
+        );
+
+        const timelineCreations = ids.map((pId: string) =>
+          prisma.timelineEvent.create({
+            data: {
+              personId: pId,
+              eventType: "CALL",
+              title: "Calls Assigned",
+              description: `Assigned to ${targetVol?.name || "volunteer"} by ${currentUser.name}${note ? ` (${note})` : ""}`,
+              createdByUserId: currentUser.id,
+            },
+          })
+        );
+
+        await prisma.$transaction([...taskCreations, ...timelineCreations]);
+      }
 
       return NextResponse.json({ success: true, count: ids.length });
     }
@@ -37,13 +79,18 @@ export async function POST(request: Request) {
 
       const volunteerIds = Array.isArray(value) ? value : body.volunteerIds;
       const batchTag = body.batchTag;
+      const priority = body.priority || "NORMAL";
+      const note = body.note || body.remarks || "";
+      const sendNotification = body.sendNotification !== false;
 
       if (!Array.isArray(volunteerIds) || volunteerIds.length === 0) {
         return NextResponse.json({ error: "No volunteers selected for distribution" }, { status: 400 });
       }
 
       // Round-robin equal distribution across selected volunteers
-      const updates = [];
+      const updates: any[] = [];
+      const now = new Date();
+
       for (let i = 0; i < ids.length; i++) {
         const assignedVolId = volunteerIds[i % volunteerIds.length];
         const updateData: any = { assignedVolunteerId: assignedVolId };
@@ -56,6 +103,22 @@ export async function POST(request: Request) {
             data: updateData,
           })
         );
+
+        if (sendNotification) {
+          updates.push(
+            prisma.followupTask.create({
+              data: {
+                personId: ids[i],
+                volunteerId: assignedVolId,
+                type: "Calling",
+                status: "PENDING",
+                priority: priority === "URGENT" ? "URGENT" : priority === "HIGH" ? "HIGH" : "MEDIUM",
+                remarks: note ? `Calling assignment: ${note}` : `New call assigned by ${currentUser.name}`,
+                dueDate: now,
+              },
+            })
+          );
+        }
       }
 
       await prisma.$transaction(updates);
