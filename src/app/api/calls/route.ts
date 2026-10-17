@@ -77,6 +77,8 @@ export async function POST(request: Request) {
       volunteerId = fallbackUser?.id || "admin";
     }
 
+    const shouldSchedule = Boolean(scheduleFollowup && followUpDate);
+
     const callLog = await prisma.callLog.create({
       data: {
         personId,
@@ -84,8 +86,8 @@ export async function POST(request: Request) {
         callType: callType || "Calling Sewa",
         outcome,
         notes,
-        followUpDate: followUpDate ? new Date(followUpDate) : null,
-        followUpPriority: followUpPriority || "MEDIUM",
+        followUpDate: shouldSchedule ? new Date(followUpDate) : null,
+        followUpPriority: shouldSchedule ? (followUpPriority || "MEDIUM") : null,
       },
     });
 
@@ -111,7 +113,7 @@ export async function POST(request: Request) {
       });
     }
 
-    if (scheduleFollowup && followUpDate) {
+    if (shouldSchedule) {
       await prisma.followupTask.create({
         data: {
           personId,
@@ -120,7 +122,7 @@ export async function POST(request: Request) {
           status: "PENDING",
           dueDate: new Date(followUpDate),
           priority: followUpPriority || "MEDIUM",
-          remarks: notes || `Follow-up after ${outcome}`,
+          remarks: notes || `Follow-up after ${outcome.replace(/_/g, " ")}`,
         },
       });
     }

@@ -819,14 +819,13 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                       <select
                         value={callOutcome}
                         onChange={(e) => setCallOutcome(e.target.value)}
-                        className="w-full p-2 border border-stone-300 rounded-lg bg-white font-semibold"
+                        className="w-full p-2 border border-stone-300 rounded-lg bg-white font-semibold text-xs"
                       >
-                        <option value="CONNECTED">Connected / Had Conversation</option>
-                        <option value="YES_WILL_ATTEND">Confirmed (Will Attend)</option>
-                        <option value="INTERESTED">Interested / Seeking Guidance</option>
-                        <option value="CALL_BACK">Call Back Requested</option>
-                        <option value="NO_ANSWER">No Answer / Ringing</option>
-                        <option value="NOT_INTERESTED">Not Interested</option>
+                        <option value="YES_WILL_ATTEND">✓ Yes, Will Attend</option>
+                        <option value="NO_WILL_NOT_ATTEND">✗ No, Will Not Attend</option>
+                        <option value="CALL_NOT_PICKED">📞 Call Not Picked</option>
+                        <option value="NOT_CONFIRMED">❓ Not Confirmed</option>
+                        <option value="CONFIRM_LATER">⏰ Confirm Later</option>
                       </select>
                     </div>
 

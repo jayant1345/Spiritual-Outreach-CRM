@@ -89,6 +89,18 @@ export async function GET(request: Request) {
             program: { select: { title: true } },
           },
         },
+        callLogs: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            outcome: true,
+            notes: true,
+            createdAt: true,
+            callType: true,
+            volunteer: { select: { id: true, name: true } },
+          },
+        },
       },
     });
 
