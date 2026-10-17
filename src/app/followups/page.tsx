@@ -5,18 +5,22 @@ import { CRMContext } from "@/components/layout/RootShell";
 import Badge from "@/components/common/Badge";
 import { CalendarClock, CheckCircle2, PhoneCall, MessageSquare, Calendar } from "lucide-react";
 
+import { useAuth } from "@/contexts/AuthContext";
+
 export default function FollowupsPage() {
   const { openPersonModal, openCallModal, openWhatsAppModal, refreshTrigger } = useContext(CRMContext);
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scope, setScope] = useState<"me" | "all">("me");
 
   useEffect(() => {
     fetchTasks();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, scope]);
 
   const fetchTasks = async () => {
     try {
-      const res = await fetch("/api/followups?status=ALL");
+      const res = await fetch(`/api/followups?status=ALL&scope=${scope}`);
       const data = await res.json();
       if (Array.isArray(data)) setTasks(data);
     } catch (err) {
@@ -28,14 +32,40 @@ export default function FollowupsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-serif font-bold text-[#08415C] flex items-center gap-2.5">
-          <CalendarClock className="w-6 h-6 text-[#D4AF37]" />
-          Follow-up Tasks Board
-        </h2>
-        <p className="text-xs text-[#78909C] mt-0.5">
-          Comprehensive follow-up tracking across calling campaigns, WhatsApp reminders, and devotee check-ins
-        </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-serif font-bold text-[#08415C] flex items-center gap-2.5">
+            <CalendarClock className="w-6 h-6 text-[#D4AF37]" />
+            Follow-up Tasks Board
+          </h2>
+          <p className="text-xs text-[#78909C] mt-0.5">
+            Comprehensive follow-up tracking across calling campaigns, WhatsApp reminders, and devotee check-ins
+          </p>
+        </div>
+
+        {/* Scope Toggle for Admins/Coordinators */}
+        {(user?.role === "SUPER_ADMIN" || user?.role === "COORDINATOR") && (
+          <div className="flex items-center gap-1 p-1 bg-stone-100 rounded-xl text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setScope("me")}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                scope === "me" ? "bg-white text-[#08415C] shadow-xs font-bold" : "text-stone-600 hover:text-stone-900"
+              }`}
+            >
+              Only My Follow-ups
+            </button>
+            <button
+              type="button"
+              onClick={() => setScope("all")}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                scope === "all" ? "bg-white text-[#08415C] shadow-xs font-bold" : "text-stone-600 hover:text-stone-900"
+              }`}
+            >
+              All Team Board
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="gold-card p-5 space-y-3">

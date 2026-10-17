@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser(request);
     const { searchParams } = new URL(request.url);
     const monthParam = searchParams.get("month"); // e.g. "2026-10" or "ALL"
+    const scope = searchParams.get("scope"); // "me" (default) or "all"
 
     let dateFilter: any = {};
     if (monthParam && monthParam !== "ALL") {
@@ -23,10 +26,24 @@ export async function GET(request: Request) {
       where: dateFilter.gte ? { createdAt: dateFilter } : undefined,
     });
 
-    const callsPending = await prisma.followupTask.count({ where: { status: "PENDING" } });
-    const callsCompleted = await prisma.callLog.count(
-      dateFilter.gte ? { where: { createdAt: dateFilter } } : undefined
-    );
+    const canViewAll = currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "COORDINATOR";
+    const isPersonalScope = !canViewAll || scope !== "all";
+
+    // User-scoped pending tasks: Devotee X's pending tasks will NEVER show for Devotee Y!
+    const pendingWhere: any = { status: "PENDING" };
+    if (isPersonalScope && currentUser) {
+      pendingWhere.volunteerId = currentUser.id;
+    }
+    const callsPending = await prisma.followupTask.count({ where: pendingWhere });
+
+    // Completed calls for this user/period
+    const callLogWhere: any = {};
+    if (dateFilter.gte) callLogWhere.createdAt = dateFilter;
+    if (isPersonalScope && currentUser) {
+      callLogWhere.volunteerId = currentUser.id;
+    }
+    const callsCompleted = await prisma.callLog.count({ where: callLogWhere });
+
     const activeCourses = await prisma.course.count({ where: { status: "ACTIVE" } });
     const courseStudents = await prisma.courseEnrollment.count();
 
@@ -46,8 +63,14 @@ export async function GET(request: Request) {
       },
     });
 
-    // Priority calling queue
+    // Priority calling queue: Strictly filter by assignedVolunteerId so Devotee Y only sees their own devotees!
+    const personWhere: any = {};
+    if (isPersonalScope && currentUser) {
+      personWhere.assignedVolunteerId = currentUser.id;
+    }
+
     const priorityCalls = await prisma.person.findMany({
+      where: personWhere,
       take: 5,
       orderBy: { updatedAt: "desc" },
       include: {

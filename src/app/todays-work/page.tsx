@@ -14,20 +14,24 @@ import {
   Filter,
 } from "lucide-react";
 
+import { useAuth } from "@/contexts/AuthContext";
+
 export default function TodaysWorkPage() {
   const { openPersonModal, openCallModal, openWhatsAppModal, refreshTrigger } = useContext(CRMContext);
+  const { user, hasPermission } = useAuth();
   const [followups, setFollowups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<"ALL" | "PENDING" | "COMPLETED">("PENDING");
+  const [scope, setScope] = useState<"me" | "all">("me");
 
   useEffect(() => {
     fetchFollowups();
-  }, [refreshTrigger, filterStatus]);
+  }, [refreshTrigger, filterStatus, scope]);
 
   const fetchFollowups = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/followups?status=${filterStatus}`);
+      const res = await fetch(`/api/followups?status=${filterStatus}&scope=${scope}`);
       const data = await res.json();
       setFollowups(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -64,8 +68,33 @@ export default function TodaysWorkPage() {
           </p>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1 p-1 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold shadow-xs overflow-x-auto w-full sm:w-auto">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end">
+          {/* Scope Toggle (For Admins/Coordinators) */}
+          {(user?.role === "SUPER_ADMIN" || user?.role === "COORDINATOR") && (
+            <div className="flex items-center gap-1 p-1 bg-stone-100 rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setScope("me")}
+                className={`px-3 py-1.5 rounded-lg transition ${
+                  scope === "me" ? "bg-white text-[#08415C] shadow-xs font-bold" : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                Only My Tasks
+              </button>
+              <button
+                type="button"
+                onClick={() => setScope("all")}
+                className={`px-3 py-1.5 rounded-lg transition ${
+                  scope === "all" ? "bg-white text-[#08415C] shadow-xs font-bold" : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                All Team Tasks
+              </button>
+            </div>
+          )}
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1 p-1 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold shadow-xs overflow-x-auto">
           <button
             onClick={() => setFilterStatus("PENDING")}
             className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap flex-shrink-0 ${
@@ -96,6 +125,7 @@ export default function TodaysWorkPage() {
           >
             All History
           </button>
+          </div>
         </div>
       </div>
 

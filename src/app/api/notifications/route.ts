@@ -11,8 +11,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const scope = searchParams.get("scope") || "me"; // "me" (default) or "all"
+
     const where: any = { status: "PENDING" };
-    if (currentUser.role === "CALLING_VOLUNTEER" || currentUser.role === "RELATIONSHIP_VOLUNTEER") {
+
+    // Default to logged-in user's tasks. Only show all team tasks if explicitly requested by admin/coordinator
+    const canViewAll = currentUser.role === "SUPER_ADMIN" || currentUser.role === "COORDINATOR";
+    if (!canViewAll || scope !== "all") {
       where.volunteerId = currentUser.id;
     }
 
@@ -31,7 +37,7 @@ export async function GET(request: Request) {
         },
         volunteer: { select: { id: true, name: true } },
       },
-      take: 50,
+      take: 100,
     });
 
     const now = new Date();
@@ -54,10 +60,14 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({
+      dueCount: overdue.length + today.length, // Actionable count (due today or overdue)
       totalPending: tasks.length,
+      all: tasks,
       overdue,
       today,
       upcoming,
+      scope,
+      canViewAll,
     });
   } catch (error: any) {
     console.error("Notifications error:", error);
@@ -67,7 +77,35 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const { id } = await request.json();
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+
+    // Support bulk mark as done
+    if (body.action === "complete_all") {
+      const scope = body.scope || "me";
+      const canViewAll = currentUser.role === "SUPER_ADMIN" || currentUser.role === "COORDINATOR";
+      const where: any = { status: "PENDING" };
+
+      if (!canViewAll || scope !== "all") {
+        where.volunteerId = currentUser.id;
+      }
+
+      await prisma.followupTask.updateMany({
+        where,
+        data: {
+          status: "COMPLETED",
+          completedAt: new Date(),
+        },
+      });
+
+      return NextResponse.json({ success: true, message: "All tasks marked as completed" });
+    }
+
+    const { id } = body;
     if (!id) {
       return NextResponse.json({ error: "Task ID required" }, { status: 400 });
     }
@@ -82,6 +120,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, task: updated });
   } catch (error: any) {
+    console.error("Notifications PATCH error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

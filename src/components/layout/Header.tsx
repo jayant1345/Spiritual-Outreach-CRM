@@ -49,13 +49,17 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Notification Bell State
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifScope, setNotifScope] = useState<"me" | "all">("me");
   const [notifData, setNotifData] = useState<{
+    dueCount: number;
     totalPending: number;
+    all: any[];
     overdue: any[];
     today: any[];
     upcoming: any[];
-  }>({ totalPending: 0, overdue: [], today: [], upcoming: [] });
-  const [activeNotifTab, setActiveNotifTab] = useState<"today" | "overdue" | "upcoming">("today");
+    canViewAll?: boolean;
+  }>({ dueCount: 0, totalPending: 0, all: [], overdue: [], today: [], upcoming: [] });
+  const [activeNotifTab, setActiveNotifTab] = useState<"all" | "today" | "overdue" | "upcoming">("today");
   const notifRef = useRef<HTMLDivElement>(null);
 
   // Fetch search results on input change
@@ -86,9 +90,9 @@ export const Header: React.FC<HeaderProps> = ({
   }, [query]);
 
   // Fetch notifications
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (scope = notifScope) => {
     try {
-      const res = await fetch("/api/notifications");
+      const res = await fetch(`/api/notifications?scope=${scope}`);
       if (res.ok) {
         const data = await res.json();
         setNotifData(data);
@@ -99,10 +103,10 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000);
+    fetchNotifications(notifScope);
+    const interval = setInterval(() => fetchNotifications(notifScope), 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [notifScope]);
 
   // Close popups on click outside
   useEffect(() => {
@@ -126,7 +130,21 @@ export const Header: React.FC<HeaderProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: taskId }),
       });
-      fetchNotifications();
+      fetchNotifications(notifScope);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkAllComplete = async () => {
+    if (!confirm("Are you sure you want to mark all these pending tasks as completed?")) return;
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "complete_all", scope: notifScope }),
+      });
+      fetchNotifications(notifScope);
     } catch (err) {
       console.error(err);
     }
@@ -256,22 +274,31 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Center Badge */}
         <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E5D8B8] rounded-xl text-xs font-semibold text-[#08415C] shadow-xs">
           <MapPin className="w-3.5 h-3.5 text-[#D4AF37]" />
-          <span>{activeCenter}</span>
         </div>
 
         {/* Notification Bell 🔔 */}
         <div ref={notifRef} className="relative flex-shrink-0">
           <button
             type="button"
-            onClick={() => setIsNotifOpen(!isNotifOpen)}
+            onClick={() => {
+              const nextState = !isNotifOpen;
+              setIsNotifOpen(nextState);
+              if (nextState) {
+                // Intelligently select active tab based on available items
+                if (notifData.overdue.length > 0) setActiveNotifTab("overdue");
+                else if (notifData.today.length > 0) setActiveNotifTab("today");
+                else if (notifData.upcoming.length > 0) setActiveNotifTab("upcoming");
+                else setActiveNotifTab("all");
+              }
+            }}
             className="p-2 sm:px-2.5 sm:py-2 bg-white border border-[#E5D8B8] rounded-xl text-stone-700 hover:text-[#08415C] hover:border-[#08415C] transition shadow-xs flex items-center gap-1.5 relative"
             title="Pending tasks and reminders"
             aria-label="Pending notifications"
           >
             <Bell className="w-4 h-4 text-[#08415C]" />
-            {notifData.totalPending > 0 && (
+            {notifData.dueCount > 0 && (
               <span className="min-w-[18px] h-[18px] px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
-                {notifData.totalPending}
+                {notifData.dueCount}
               </span>
             )}
           </button>
@@ -280,139 +307,215 @@ export const Header: React.FC<HeaderProps> = ({
           {isNotifOpen && (
             <>
               <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setIsNotifOpen(false)} />
-              <div className="fixed inset-x-3 top-16 sm:absolute sm:top-full sm:right-0 sm:left-auto sm:w-96 sm:mt-2 max-w-sm mx-auto bg-white rounded-2xl shadow-2xl border border-stone-200 py-2.5 z-50 animate-fadeIn">
-              <div className="px-4 py-2 border-b border-stone-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
-                    <Bell className="w-3.5 h-3.5 text-[#08415C]" />
-                    <span>Pending Tasks & Reminders</span>
-                  </h3>
-                  <p className="text-[10px] text-stone-500">
-                    {notifData.totalPending} items requiring your seva action
-                  </p>
-                </div>
-                {notifData.totalPending > 0 && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
-                    {notifData.totalPending} Pending
-                  </span>
-                )}
-              </div>
+              <div className="fixed inset-x-3 top-16 sm:absolute sm:top-full sm:right-0 sm:left-auto sm:w-[420px] sm:mt-2 max-w-md mx-auto bg-white rounded-2xl shadow-2xl border border-stone-200 py-2.5 z-50 animate-fadeIn">
+                {/* Header Bar */}
+                <div className="px-4 py-2 border-b border-stone-100 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                        <Bell className="w-3.5 h-3.5 text-[#08415C]" />
+                        <span>{notifScope === "me" ? "My Tasks & Reminders" : "Team Tasks & Reminders"}</span>
+                      </h3>
+                      <p className="text-[10px] text-stone-500">
+                        {notifData.dueCount > 0
+                          ? `${notifData.dueCount} items due today or overdue`
+                          : `All cleared for today • ${notifData.upcoming.length} upcoming`}
+                      </p>
+                    </div>
 
-              {/* Tabs: Today, Overdue, Upcoming */}
-              <div className="flex border-b border-stone-100 px-3 pt-2 gap-1 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setActiveNotifTab("today")}
-                  className={`flex-1 py-1.5 rounded-lg text-center font-bold text-[11px] transition ${
-                    activeNotifTab === "today"
-                      ? "bg-[#08415C] text-white shadow-xs"
-                      : "text-stone-600 hover:bg-stone-100"
-                  }`}
-                >
-                  Today ({notifData.today.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveNotifTab("overdue")}
-                  className={`flex-1 py-1.5 rounded-lg text-center font-bold text-[11px] transition ${
-                    activeNotifTab === "overdue"
-                      ? "bg-rose-600 text-white shadow-xs"
-                      : "text-rose-700 hover:bg-rose-50"
-                  }`}
-                >
-                  Overdue ({notifData.overdue.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveNotifTab("upcoming")}
-                  className={`flex-1 py-1.5 rounded-lg text-center font-bold text-[11px] transition ${
-                    activeNotifTab === "upcoming"
-                      ? "bg-[#08415C] text-white shadow-xs"
-                      : "text-stone-600 hover:bg-stone-100"
-                  }`}
-                >
-                  Upcoming ({notifData.upcoming.length})
-                </button>
-              </div>
+                    <div className="flex items-center gap-2">
+                      {notifData.dueCount > 0 ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                          {notifData.dueCount} Due
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          ✓ Cleared
+                        </span>
+                      )}
 
-              {/* Task Items List */}
-              <div className="max-h-80 overflow-y-auto divide-y divide-stone-100 p-1">
-                {(activeNotifTab === "today"
-                  ? notifData.today
-                  : activeNotifTab === "overdue"
-                  ? notifData.overdue
-                  : notifData.upcoming
-                ).length === 0 ? (
-                  <div className="p-6 text-center text-xs text-stone-500">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-1.5" />
-                    <p className="font-semibold text-stone-700">All cleared!</p>
-                    <p className="text-[11px]">No {activeNotifTab} pending tasks.</p>
-                  </div>
-                ) : (
-                  (activeNotifTab === "today"
-                    ? notifData.today
-                    : activeNotifTab === "overdue"
-                    ? notifData.overdue
-                    : notifData.upcoming
-                  ).map((t) => (
-                    <div
-                      key={t.id}
-                      onClick={() => {
-                        setIsNotifOpen(false);
-                        if (t.person?.id) openPersonModal(t.person.id);
-                      }}
-                      className="p-3 hover:bg-stone-50 rounded-xl transition cursor-pointer flex items-start justify-between gap-2.5"
-                    >
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              activeNotifTab === "overdue" ? "bg-rose-500" : "bg-amber-500"
-                            }`}
-                          />
-                          <p className="text-xs font-bold text-stone-900 truncate">
-                            {t.type} with {t.person?.fullName || "Member"}
-                          </p>
-                        </div>
-                        <p className="text-[11px] text-stone-500 truncate">{t.remarks || t.person?.mobile}</p>
-                        <div className="flex items-center gap-2 text-[10px] text-stone-400">
-                          <Calendar className="w-3 h-3 text-[#D4AF37]" />
-                          <span>Due: {new Date(t.dueDate).toLocaleDateString("en-IN")}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 flex-shrink-0 pt-0.5">
-                        {t.person && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsNotifOpen(false);
-                              openCallModal(t.person);
-                            }}
-                            className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition"
-                            title="Call Now"
-                          >
-                            <Phone className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                      {notifData.totalPending > 0 && (
                         <button
                           type="button"
-                          onClick={(e) => handleMarkTaskComplete(t.id, e)}
-                          className="p-1.5 bg-stone-100 hover:bg-emerald-600 hover:text-white rounded-lg transition text-stone-600"
-                          title="Mark Done"
+                          onClick={handleMarkAllComplete}
+                          className="text-[10px] text-stone-500 hover:text-emerald-700 underline font-medium"
+                          title="Mark all pending tasks in this view as completed"
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Clear All
                         </button>
-                      </div>
+                      )}
                     </div>
-                  ))
-                )}
+                  </div>
+
+                  {/* Admin Scope Switcher: My Tasks vs Team Tasks */}
+                  {notifData.canViewAll && (
+                    <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg text-[10px] font-semibold self-start">
+                      <button
+                        type="button"
+                        onClick={() => setNotifScope("me")}
+                        className={`px-2.5 py-1 rounded-md transition ${
+                          notifScope === "me" ? "bg-white text-[#08415C] shadow-xs font-bold" : "text-stone-500 hover:text-stone-800"
+                        }`}
+                      >
+                        Only My Tasks
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNotifScope("all")}
+                        className={`px-2.5 py-1 rounded-md transition ${
+                          notifScope === "all" ? "bg-white text-[#08415C] shadow-xs font-bold" : "text-stone-500 hover:text-stone-800"
+                        }`}
+                      >
+                        All Team Tasks
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tabs: Today, Overdue, Upcoming, All */}
+                <div className="flex border-b border-stone-100 px-3 pt-2 gap-1 text-xs overflow-x-auto">
+                  <button
+                    type="button"
+                    onClick={() => setActiveNotifTab("today")}
+                    className={`py-1.5 px-2 rounded-lg text-center font-bold text-[11px] whitespace-nowrap transition ${
+                      activeNotifTab === "today"
+                        ? "bg-[#08415C] text-white shadow-xs"
+                        : "text-stone-600 hover:bg-stone-100"
+                    }`}
+                  >
+                    Today ({notifData.today.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveNotifTab("overdue")}
+                    className={`py-1.5 px-2 rounded-lg text-center font-bold text-[11px] whitespace-nowrap transition ${
+                      activeNotifTab === "overdue"
+                        ? "bg-rose-600 text-white shadow-xs"
+                        : "text-rose-700 hover:bg-rose-50"
+                    }`}
+                  >
+                    Overdue ({notifData.overdue.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveNotifTab("upcoming")}
+                    className={`py-1.5 px-2 rounded-lg text-center font-bold text-[11px] whitespace-nowrap transition ${
+                      activeNotifTab === "upcoming"
+                        ? "bg-[#08415C] text-white shadow-xs"
+                        : "text-stone-600 hover:bg-stone-100"
+                    }`}
+                  >
+                    Upcoming ({notifData.upcoming.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveNotifTab("all")}
+                    className={`py-1.5 px-2 rounded-lg text-center font-bold text-[11px] whitespace-nowrap transition ${
+                      activeNotifTab === "all"
+                        ? "bg-stone-800 text-white shadow-xs"
+                        : "text-stone-600 hover:bg-stone-100"
+                    }`}
+                  >
+                    All ({notifData.totalPending})
+                  </button>
+                </div>
+
+                {/* Task Items List */}
+                <div className="max-h-80 overflow-y-auto divide-y divide-stone-100 p-1">
+                  {(() => {
+                    const items =
+                      activeNotifTab === "today"
+                        ? notifData.today
+                        : activeNotifTab === "overdue"
+                        ? notifData.overdue
+                        : activeNotifTab === "upcoming"
+                        ? notifData.upcoming
+                        : notifData.all || [];
+
+                    if (items.length === 0) {
+                      return (
+                        <div className="p-6 text-center text-xs text-stone-500">
+                          <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-1.5" />
+                          <p className="font-semibold text-stone-700">All cleared!</p>
+                          <p className="text-[11px]">
+                            {activeNotifTab === "today"
+                              ? "No tasks due today."
+                              : activeNotifTab === "overdue"
+                              ? "No overdue pending tasks."
+                              : activeNotifTab === "upcoming"
+                              ? "No upcoming tasks scheduled."
+                              : "No pending tasks found."}
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return items.map((t) => (
+                      <div
+                        key={t.id}
+                        onClick={() => {
+                          setIsNotifOpen(false);
+                          if (t.person?.id) openPersonModal(t.person.id);
+                        }}
+                        className="p-3 hover:bg-stone-50 rounded-xl transition cursor-pointer flex items-start justify-between gap-2.5"
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                new Date(t.dueDate) < new Date(new Date().setHours(0, 0, 0, 0))
+                                  ? "bg-rose-500"
+                                  : new Date(t.dueDate) <= new Date(new Date().setHours(23, 59, 59, 999))
+                                  ? "bg-emerald-500"
+                                  : "bg-blue-400"
+                              }`}
+                            />
+                            <p className="text-xs font-bold text-stone-900 truncate">
+                              {t.type} with {t.person?.fullName || "Member"}
+                            </p>
+                          </div>
+                          <p className="text-[11px] text-stone-500 truncate">{t.remarks || t.person?.mobile}</p>
+                          <div className="flex items-center gap-2 text-[10px] text-stone-400">
+                            <Calendar className="w-3 h-3 text-[#D4AF37]" />
+                            <span>Due: {new Date(t.dueDate).toLocaleDateString("en-IN")}</span>
+                            {t.volunteer?.name && (
+                              <span>• Assigned: {t.volunteer.name}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 flex-shrink-0 pt-0.5">
+                          {t.person && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsNotifOpen(false);
+                                openCallModal(t.person);
+                              }}
+                              className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition"
+                              title="Call Now"
+                            >
+                              <Phone className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => handleMarkTaskComplete(t.id, e)}
+                            className="p-1.5 bg-stone-100 hover:bg-emerald-600 hover:text-white rounded-lg transition text-stone-600"
+                            title="Mark Done"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
-            </div>
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
 
       {/* Rename: + Add New Members (Previously + Add Seeker) */}
       {onOpenAddPerson && (
