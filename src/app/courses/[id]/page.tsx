@@ -31,6 +31,7 @@ import {
   Clock,
   Trash2,
   Settings,
+  MoreVertical,
 } from "lucide-react";
 import EditBatchModal from "@/components/courses/EditBatchModal";
 import EditCourseModal from "@/components/courses/EditCourseModal";
@@ -56,6 +57,7 @@ function CourseAttendanceMatrixInner() {
   const [markingSessionId, setMarkingSessionId] = useState<string | null>(null);
   const [isEditBatchOpen, setIsEditBatchOpen] = useState(false);
   const [isEditCourseOpen, setIsEditCourseOpen] = useState(false);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [isEditSessionOpen, setIsEditSessionOpen] = useState(false);
   const [sessionEditForm, setSessionEditForm] = useState({
     id: "",
@@ -449,54 +451,105 @@ function CourseAttendanceMatrixInner() {
             </p>
           </div>
 
-          {/* Quick Action Buttons */}
-          <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+          {/* Quick Action Buttons: Primary Calling Desk + Clean 3-Dot More Menu */}
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-shrink-0">
             <Link
               href={`/calling-sewa?batch=${encodeURIComponent(batch.batchName)}`}
-              className="px-3.5 py-2 bg-amber-50 border border-amber-300 hover:bg-amber-100 text-xs font-bold text-amber-900 rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
+              className="flex-1 sm:flex-initial px-3.5 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-xs font-bold text-amber-900 rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition"
               title={`Open Calling Desk for ${batch.batchName}`}
             >
               <PhoneCall className="w-4 h-4 text-amber-700" />
               <span>📞 Calling Desk</span>
             </Link>
 
-            <button
-              type="button"
-              onClick={() => setIsEditCourseOpen(true)}
-              className="px-3.5 py-2 bg-white border border-[#E5D8B8] hover:border-[#D4AF37] text-xs font-bold text-[#08415C] rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
-              title="Edit / Customize course details"
-            >
-              <Edit2 className="w-3.5 h-3.5 text-[#D4AF37]" />
-              <span>✏️ Edit Course</span>
-            </button>
-
-            <button
-              onClick={handleExportExcel}
-              className="px-3.5 py-2 bg-white border border-[#E5D8B8] hover:border-[#D4AF37] text-xs font-semibold text-[#08415C] rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-[#00A896]" />
-              <span>Export Matrix (.xlsx)</span>
-            </button>
-
+            {/* Desktop quick action: Customize & Edit Batch */}
             <button
               type="button"
               onClick={() => setIsEditBatchOpen(true)}
-              className="px-3.5 py-2 bg-[#08415C] hover:bg-[#063349] text-xs font-bold text-white rounded-xl shadow-gold flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
+              className="hidden md:flex px-3 py-2 bg-[#08415C] hover:bg-[#063349] text-xs font-bold text-white rounded-xl shadow-gold items-center justify-center gap-1.5 transition"
               title="Edit Batch Name, Schedule, Start Date & Full Session Customization"
             >
-              <Settings className="w-4 h-4 text-[#D4AF37]" />
-              <span>⚙️ Customize &amp; Edit Batch</span>
+              <Settings className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>Customize Batch</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleDeleteCurrentBatch}
-              className="px-3 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-xs font-bold text-rose-700 rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition w-full sm:w-auto"
-              title="Delete this batch permanently"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-              <span>Delete Batch</span>
-            </button>
+            {/* 3-Dot More Menu Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsActionsMenuOpen(!isActionsMenuOpen)}
+                className={`p-2 rounded-xl border transition flex items-center justify-center ${
+                  isActionsMenuOpen
+                    ? "bg-[#08415C] text-white border-[#08415C]"
+                    : "bg-white border-[#E5D8B8] hover:border-[#08415C] text-stone-700 hover:text-[#08415C] shadow-xs"
+                }`}
+                title="More Batch & Course Actions"
+                aria-label="More options"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+
+              {isActionsMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setIsActionsMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-stone-200 rounded-2xl shadow-2xl py-1.5 z-40 animate-fadeIn text-xs">
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-stone-400 uppercase tracking-wider border-b border-stone-100">
+                      Batch Actions
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        setIsEditCourseOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-stone-700 hover:bg-stone-50 font-medium transition text-left"
+                    >
+                      <Edit2 className="w-4 h-4 text-[#D4AF37]" />
+                      <span>✏️ Edit Course Details</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        setIsEditBatchOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-stone-700 hover:bg-stone-50 font-medium transition text-left"
+                    >
+                      <Settings className="w-4 h-4 text-[#08415C]" />
+                      <span>⚙️ Customize &amp; Edit Batch</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        handleExportExcel();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-stone-700 hover:bg-stone-50 font-medium transition text-left"
+                    >
+                      <FileSpreadsheet className="w-4 h-4 text-[#00A896]" />
+                      <span>📊 Export Matrix (.xlsx)</span>
+                    </button>
+
+                    <div className="border-t border-stone-100 my-1" />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        handleDeleteCurrentBatch();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-700 hover:bg-rose-50 font-semibold transition text-left"
+                    >
+                      <Trash2 className="w-4 h-4 text-rose-600" />
+                      <span>🗑️ Delete Batch</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -600,37 +653,56 @@ function CourseAttendanceMatrixInner() {
       {/* MODE 1: FATAFAT FAST CHECK-IN (DOOR / RECEPTION KIOSK) */}
       {activeMode === "checkin" && (
         <div className="space-y-4">
-          {/* Calling RSVP vs. Arrived Tracker Card */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-2xl text-center">
-              <div className="text-[11px] text-blue-800 font-bold">📞 Calling Confirmed (Said YES)</div>
-              <div className="text-2xl font-bold font-serif text-blue-900 mt-0.5">{confirmedRsvpCount} Devotees</div>
-              <div className="text-[10px] text-blue-700 mt-0.5">Promised during outreach calling</div>
-            </div>
-
-            <div className="p-3 bg-emerald-50/80 border border-emerald-300 rounded-2xl text-center">
-              <div className="text-[11px] text-emerald-800 font-bold">🟢 Arrived &amp; Present</div>
-              <div className="text-2xl font-bold font-serif text-emerald-700 mt-0.5">{presentInSessionCount} Checked In</div>
-              <div className="text-[10px] text-emerald-700 mt-0.5">
-                {confirmedRsvpCount > 0 ? `${Math.round((presentInSessionCount / confirmedRsvpCount) * 100)}% of confirmed RSVPs` : "Marked present"}
+          {/* Calling RSVP vs. Arrived Tracker Card - Compact 3-Column on mobile */}
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
+            {/* Card 1: Calling Confirmed */}
+            <div className="p-2 sm:p-3 bg-blue-50/80 border border-blue-200 rounded-xl sm:rounded-2xl text-center flex flex-col justify-center">
+              <div className="text-[10px] sm:text-xs text-blue-800 font-bold flex items-center justify-center gap-1">
+                <span>📞 Confirmed</span>
+                <span className="hidden sm:inline">(Said YES)</span>
+              </div>
+              <div className="text-base sm:text-2xl font-bold font-serif text-blue-900 mt-0.5">
+                {confirmedRsvpCount} <span className="text-[10px] sm:text-xs font-sans font-normal text-blue-700">Devotees</span>
+              </div>
+              <div className="text-[9px] sm:text-[10px] text-blue-700 mt-0.5 hidden sm:block">
+                Promised during outreach calling
               </div>
             </div>
 
+            {/* Card 2: Arrived & Present */}
+            <div className="p-2 sm:p-3 bg-emerald-50/80 border border-emerald-300 rounded-xl sm:rounded-2xl text-center flex flex-col justify-center">
+              <div className="text-[10px] sm:text-xs text-emerald-800 font-bold flex items-center justify-center gap-1">
+                <span>🟢 Present</span>
+                <span className="hidden sm:inline">&amp; Arrived</span>
+              </div>
+              <div className="text-base sm:text-2xl font-bold font-serif text-emerald-700 mt-0.5">
+                {presentInSessionCount} <span className="text-[10px] sm:text-xs font-sans font-normal text-emerald-600">Checked In</span>
+              </div>
+              <div className="text-[9px] sm:text-[10px] text-emerald-700 mt-0.5">
+                {confirmedRsvpCount > 0 ? `${Math.round((presentInSessionCount / confirmedRsvpCount) * 100)}% RSVP` : "Marked present"}
+              </div>
+            </div>
+
+            {/* Card 3: Pending RSVP */}
             <div
               onClick={() => setCheckinFilter(checkinFilter === "PENDING_RSVP" ? "ALL" : "PENDING_RSVP")}
-              className={`p-3 rounded-2xl text-center cursor-pointer transition border ${
+              className={`p-2 sm:p-3 rounded-xl sm:rounded-2xl text-center cursor-pointer transition border flex flex-col justify-center ${
                 checkinFilter === "PENDING_RSVP"
                   ? "bg-amber-100 border-amber-400 ring-2 ring-amber-500 shadow-xs"
                   : "bg-amber-50/80 border-amber-300 hover:bg-amber-100/70"
               }`}
               title="Tap to show only pending devotees who said YES to follow up"
             >
-              <div className="text-[11px] text-amber-900 font-bold flex items-center justify-center gap-1">
-                <span>🟡 Pending (Said YES, Not Arrived)</span>
-                <span className="text-[9px] px-1.5 py-0.2 bg-amber-200 text-amber-900 rounded-full font-bold">Call Now</span>
+              <div className="text-[10px] sm:text-xs text-amber-900 font-bold flex items-center justify-center gap-1">
+                <span>🟡 Pending</span>
+                <span className="text-[8px] sm:text-[9px] px-1 py-0.2 bg-amber-200 text-amber-900 rounded-full font-bold">Call</span>
               </div>
-              <div className="text-2xl font-bold font-serif text-amber-800 mt-0.5">{pendingRsvpCount} Devotees</div>
-              <div className="text-[10px] text-amber-800 font-semibold mt-0.5">Tap here to call &amp; follow up ➔</div>
+              <div className="text-base sm:text-2xl font-bold font-serif text-amber-800 mt-0.5">
+                {pendingRsvpCount} <span className="text-[10px] sm:text-xs font-sans font-normal text-amber-700">Devotees</span>
+              </div>
+              <div className="text-[9px] sm:text-[10px] text-amber-800 font-semibold mt-0.5 truncate">
+                Tap to call ➔
+              </div>
             </div>
           </div>
 
