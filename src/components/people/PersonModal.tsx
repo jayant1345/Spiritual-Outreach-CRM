@@ -223,6 +223,22 @@ export const PersonModal: React.FC<PersonModalProps> = ({
     return null;
   };
 
+  const getCustomFields = (p: any): { key: string; value: string }[] => {
+    if (!p?.customData) return [];
+    try {
+      const parsed = typeof p.customData === "string" ? JSON.parse(p.customData) : p.customData;
+      const result: { key: string; value: string }[] = [];
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (k !== "photoUrl" && k !== "photo" && k !== "labels" && typeof v === "string" && v.trim()) {
+          result.push({ key: k, value: v });
+        }
+      });
+      return result;
+    } catch {
+      return [];
+    }
+  };
+
   useEffect(() => {
     if (isOpen && personId) {
       fetchPersonDetails(personId);
@@ -658,6 +674,31 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                       <MapPin className="w-3 h-3 text-[#D4AF37]" /> {person.area || "Chandkheda"}
                     </span>
                   </div>
+
+                  {/* Labels & Tags Badges */}
+                  {person.tags && (
+                    <div className="flex items-center gap-1 flex-wrap mt-1">
+                      {person.tags
+                        .split(",")
+                        .map((t: string) => t.trim())
+                        .filter((t: string) => t && t !== "Male" && t !== "Female" && t !== "Other")
+                        .map((tag: string, idx: number) => {
+                          const isLabel = ["Youth", "Chairman", "Senior Citizen", "Life Patron", "Donor", "Volunteer"].includes(tag);
+                          return (
+                            <span
+                              key={idx}
+                              className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md border ${
+                                isLabel
+                                  ? "bg-[#FAF5E6] text-[#08415C] border-[#D4AF37]/60"
+                                  : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              }`}
+                            >
+                              {isLabel ? `🏷️ ${tag}` : `🔖 ${tag}`}
+                            </span>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1169,6 +1210,23 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                     <p className="text-stone-700 mt-1 whitespace-pre-wrap text-xs bg-stone-50 p-2.5 rounded-xl border border-stone-200">
                       {person.notes}
                     </p>
+                  </div>
+                )}
+
+                {/* Additional Custom Fields Display */}
+                {getCustomFields(person).length > 0 && (
+                  <div className="pt-2 border-t border-stone-100 text-xs">
+                    <span className="text-[10px] text-stone-400 block uppercase font-bold mb-1.5">
+                      Additional Information / Custom Fields
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {getCustomFields(person).map((f, i) => (
+                        <div key={i} className="p-2 bg-stone-50 border border-stone-200 rounded-xl">
+                          <span className="text-[10px] text-stone-500 uppercase font-bold block">{f.key}</span>
+                          <span className="font-semibold text-stone-800 text-xs">{f.value}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

@@ -17,6 +17,8 @@ import {
   Bookmark,
   Camera,
   Upload,
+  Sliders,
+  Trash2,
 } from "lucide-react";
 import { CRMContext } from "../layout/RootShell";
 
@@ -29,15 +31,23 @@ interface AddPersonModalProps {
 }
 
 const SUGGESTED_LABELS = [
-  "Sunday Feast",
   "Youth",
+  "Chairman",
+  "Senior Citizen",
   "Life Patron",
   "Donor",
-  "Festival Guest",
-  "Bhakti Vriksha",
   "Volunteer",
+  "Sunday Feast",
   "Book Reader",
-  "Counselor Student",
+];
+
+const SUGGESTED_TAGS = [
+  "Interested",
+  "Not Interested",
+  "Connected",
+  "Regular",
+  "New Seeker",
+  "Follow-up Required",
 ];
 
 export const AddPersonModal: React.FC<AddPersonModalProps> = ({
@@ -75,9 +85,18 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
   const [selectedCourseId, setSelectedCourseId] = useState<string>(initialCourseId || "");
   const [selectedBatchId, setSelectedBatchId] = useState<string>(initialBatchId || "");
 
-  // Google Contacts style Labels
+  // Member Labels (Youth, Chairman, Senior Citizen, etc.)
   const [labels, setLabels] = useState<string[]>([]);
   const [newLabelInput, setNewLabelInput] = useState<string>("");
+
+  // Status & Outreach Tags (Interested, Not Interested, Connected, Regular, etc.)
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState<string>("");
+
+  // Custom Fields (Add Manually Field: Key & Value)
+  const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
+  const [newCustomKey, setNewCustomKey] = useState<string>("");
+  const [newCustomVal, setNewCustomVal] = useState<string>("");
 
   // Family specific fields
   const [familyMembersCount, setFamilyMembersCount] = useState(2);
@@ -183,6 +202,36 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
     setLabels((prev) => prev.filter((l) => l !== labelToRemove));
   };
 
+  const handleAddTag = (tagToAdd?: string) => {
+    const val = (tagToAdd || newTagInput).trim();
+    if (!val) return;
+    if (!tags.includes(val)) {
+      setTags((prev) => [...prev, val]);
+      if (["Interested", "Not Interested", "Connected", "Regular", "Follow-up Required", "New Member"].includes(val)) {
+        setStage(val);
+      }
+    }
+    setNewTagInput("");
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags((prev) => prev.filter((t) => t !== tagToRemove));
+  };
+
+  const handleAddCustomField = () => {
+    if (!newCustomKey.trim() || !newCustomVal.trim()) return;
+    setCustomFields((prev) => [
+      ...prev.filter((f) => f.key.toLowerCase() !== newCustomKey.trim().toLowerCase()),
+      { key: newCustomKey.trim(), value: newCustomVal.trim() },
+    ]);
+    setNewCustomKey("");
+    setNewCustomVal("");
+  };
+
+  const handleRemoveCustomField = (indexToRemove: number) => {
+    setCustomFields((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -234,7 +283,27 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
         ? `[Family Registration - ${familyMembersCount} Members: ${familyDetails}] ${notes}`.trim()
         : (referredBy ? `[Referred By: ${referredBy}] ${notes}`.trim() : notes);
 
-      const allTags = memberType === "family" ? ["Family", gender, ...labels] : [gender, ...labels];
+      // Build customData object with custom fields, photo, and labels
+      const customDataObj: any = {};
+      if (photoUrl) customDataObj.photoUrl = photoUrl;
+      if (labels.length > 0) customDataObj.labels = labels;
+      if (customFields.length > 0) {
+        customFields.forEach((cf) => {
+          if (cf.key.trim() && cf.value.trim()) {
+            customDataObj[cf.key.trim()] = cf.value.trim();
+          }
+        });
+      }
+
+      // Determine stage
+      const matchingStageTag = tags.find((t) =>
+        ["Interested", "Not Interested", "Connected", "Regular", "Follow-up Required", "New Member"].includes(t)
+      );
+      const effectiveStage = matchingStageTag || stage || "New Member";
+
+      const allTags = memberType === "family"
+        ? ["Family", gender, ...labels, ...tags]
+        : [gender, ...labels, ...tags];
       const uniqueTags = Array.from(new Set(allTags.filter(Boolean))).join(", ");
 
       const res = await fetch("/api/people", {
@@ -249,12 +318,12 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
           ageGroup: calculatedAge ? `${calculatedAge} yrs` : undefined,
           profession,
           source: referredBy ? `Referral (${referredBy})` : source,
-          stage,
+          stage: effectiveStage,
           assignedVolunteerId: assignedVolunteerId || null,
           notes: combinedNotes,
           tags: uniqueTags,
           photoUrl: photoUrl || undefined,
-          customData: photoUrl ? { photoUrl } : undefined,
+          customData: Object.keys(customDataObj).length > 0 ? customDataObj : undefined,
           courseId: selectedCourseId || undefined,
           batchId: selectedBatchId || undefined,
         }),
@@ -278,6 +347,11 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
       setSelectedBatchId("");
       setLabels([]);
       setNewLabelInput("");
+      setTags([]);
+      setNewTagInput("");
+      setCustomFields([]);
+      setNewCustomKey("");
+      setNewCustomVal("");
       setExistingPerson(null);
     } catch (err: any) {
       setError(err.message);
@@ -737,23 +811,23 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
             )}
           </div>
 
-          {/* Labels / Tags (Google Contacts style - Admin requirement) */}
-          <div className="bg-white p-3.5 rounded-2xl border border-stone-200 space-y-2">
+          {/* BOX 1: Member Labels (Admin requirement: Youth, Chairman, Senior Citizen, etc.) */}
+          <div className="bg-[#FAF8F5] p-3.5 rounded-2xl border border-[#E5D8B8] space-y-2.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-[#00A896]" />
-                <span>Labels (Google Contacts Style)</span>
+              <label className="text-xs font-bold text-[#08415C] uppercase tracking-wider flex items-center gap-1.5">
+                <Bookmark className="w-3.5 h-3.5 text-[#D4AF37]" />
+                <span>Member Labels (e.g. Youth, Chairman, Senior Citizen)</span>
               </label>
-              <span className="text-[10px] text-stone-400">Add custom tags or select suggestions</span>
+              <span className="text-[10px] text-stone-400">Select presets or add custom label</span>
             </div>
 
             {/* Active Labels Chips */}
             {labels.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap pt-1">
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 {labels.map((lbl) => (
                   <span
                     key={lbl}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#FAF5E6] text-[#08415C] border border-[#D4AF37]/60 shadow-2xs"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-[#08415C] border border-[#D4AF37] shadow-2xs"
                   >
                     <span>🏷️ {lbl}</span>
                     <button
@@ -769,8 +843,8 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
               </div>
             )}
 
-            {/* Input for custom label */}
-            <div className="flex items-center gap-2 pt-1">
+            {/* Input to Add Custom Label Manually */}
+            <div className="flex items-center gap-2 pt-0.5">
               <input
                 type="text"
                 value={newLabelInput}
@@ -781,22 +855,22 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
                     handleAddLabel();
                   }
                 }}
-                placeholder="Type a new label and press Enter or click Add..."
-                className="flex-1 text-xs p-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-[#08415C] outline-none"
+                placeholder="Type custom label manually (e.g. Chairman, Trustee, Doctor, VIP)..."
+                className="flex-1 text-xs p-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-[#08415C] outline-none"
               />
               <button
                 type="button"
                 onClick={() => handleAddLabel()}
-                className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold rounded-xl transition flex items-center gap-1 flex-shrink-0"
+                className="px-3.5 py-2.5 bg-[#08415C] hover:bg-[#0B4F6C] text-white text-xs font-bold rounded-xl transition flex items-center gap-1 flex-shrink-0 shadow-2xs"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Label</span>
+                <Plus className="w-3.5 h-3.5 text-[#D4AF37]" />
+                <span>+ Add Label</span>
               </button>
             </div>
 
-            {/* Quick Suggestions Chips */}
-            <div className="flex items-center gap-1.5 flex-wrap pt-1.5">
-              <span className="text-[10px] text-stone-400 font-medium">Suggestions:</span>
+            {/* Preset Suggested Label Chips */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+              <span className="text-[10px] text-stone-500 font-bold">Preset Labels:</span>
               {SUGGESTED_LABELS.map((sug) => {
                 const isAdded = labels.includes(sug);
                 return (
@@ -804,16 +878,163 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
                     key={sug}
                     type="button"
                     onClick={() => (isAdded ? handleRemoveLabel(sug) : handleAddLabel(sug))}
-                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border transition ${
+                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition ${
                       isAdded
-                        ? "bg-[#08415C] text-white border-[#08415C]"
-                        : "bg-stone-50 text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-100"
+                        ? "bg-[#08415C] text-white border-[#08415C] shadow-2xs"
+                        : "bg-white text-stone-700 border-stone-300 hover:border-[#D4AF37] hover:bg-[#FAF5E6]"
                     }`}
                   >
                     {isAdded ? `✓ ${sug}` : `+ ${sug}`}
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* BOX 2: Status & Outreach Tags (Admin requirement: Interested, Not Interested, Connected, Regular) */}
+          <div className="bg-white p-3.5 rounded-2xl border border-stone-200 space-y-2.5 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-[#00A896]" />
+                <span>Status &amp; Outreach Tags (e.g. Interested, Connected, Regular)</span>
+              </label>
+              <span className="text-[10px] text-stone-400">Select status tag or add custom</span>
+            </div>
+
+            {/* Active Tags Chips */}
+            {tags.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                {tags.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs"
+                  >
+                    <span>🔖 {t}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(t)}
+                      className="text-stone-400 hover:text-rose-600 transition ml-0.5"
+                      aria-label={`Remove ${t}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Input to Add Custom Tag Manually */}
+            <div className="flex items-center gap-2 pt-0.5">
+              <input
+                type="text"
+                value={newTagInput}
+                onChange={(e) => setNewTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddTag();
+                  }
+                }}
+                placeholder="Type custom tag manually (e.g. Gita Reader, Youth Fest 2026, Camp)..."
+                className="flex-1 text-xs p-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-[#00A896] outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => handleAddTag()}
+                className="px-3.5 py-2.5 bg-[#00A896] hover:bg-[#028090] text-white text-xs font-bold rounded-xl transition flex items-center gap-1 flex-shrink-0 shadow-2xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add Tag</span>
+              </button>
+            </div>
+
+            {/* Preset Suggested Tag Chips */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+              <span className="text-[10px] text-stone-500 font-bold">Preset Tags:</span>
+              {SUGGESTED_TAGS.map((sug) => {
+                const isAdded = tags.includes(sug);
+                return (
+                  <button
+                    key={sug}
+                    type="button"
+                    onClick={() => (isAdded ? handleRemoveTag(sug) : handleAddTag(sug))}
+                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition ${
+                      isAdded
+                        ? "bg-[#00A896] text-white border-[#00A896] shadow-2xs"
+                        : "bg-stone-50 text-stone-700 border-stone-200 hover:border-emerald-300 hover:bg-emerald-50"
+                    }`}
+                  >
+                    {isAdded ? `✓ ${sug}` : `+ ${sug}`}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* BOX 3: Add Custom Field / Additional Information (Admin requirement: ON OTHER BOX WE CAN GIVE OPTION FOR ADD MANUALLY FIELD) */}
+          <div className="bg-[#FAF8F5] p-3.5 rounded-2xl border border-stone-200 space-y-2.5 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-[#08415C]" />
+                <span>Add Custom Field Manually (વધારાની નવી વિગતો)</span>
+              </label>
+              <span className="text-[10px] text-stone-500">e.g. Flat No, Company, Native Place</span>
+            </div>
+
+            {/* Active Custom Fields List */}
+            {customFields.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                {customFields.map((field, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs bg-white border border-stone-300 shadow-2xs"
+                  >
+                    <span className="font-bold text-[#08415C]">{field.key}:</span>
+                    <span className="text-stone-700">{field.value}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCustomField(idx)}
+                      className="text-stone-400 hover:text-rose-600 transition ml-1"
+                      aria-label={`Remove ${field.key}`}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Inputs to Add Custom Field */}
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-0.5">
+              <input
+                type="text"
+                value={newCustomKey}
+                onChange={(e) => setNewCustomKey(e.target.value)}
+                placeholder="Field Name (e.g. Company, Flat No)"
+                className="sm:col-span-2 text-xs p-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-[#08415C] outline-none font-semibold text-stone-800"
+              />
+              <input
+                type="text"
+                value={newCustomVal}
+                onChange={(e) => setNewCustomVal(e.target.value)}
+                placeholder="Field Value (e.g. TCS, B-402, Mehsana)"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddCustomField();
+                  }
+                }}
+                className="sm:col-span-2 text-xs p-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-[#08415C] outline-none text-stone-800"
+              />
+              <button
+                type="button"
+                onClick={handleAddCustomField}
+                disabled={!newCustomKey.trim() || !newCustomVal.trim()}
+                className="sm:col-span-1 px-3 py-2.5 bg-stone-800 hover:bg-stone-900 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1 shadow-2xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add</span>
+              </button>
             </div>
           </div>
 
