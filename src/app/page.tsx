@@ -18,6 +18,7 @@ import {
   ArrowRight,
   MessageSquare,
   ChevronRight,
+  ChevronDown,
   MapPin,
   Flame,
   Calendar,
@@ -29,7 +30,37 @@ import {
   ShieldCheck,
   Building2,
   RefreshCw,
+  BookOpen,
+  Search,
+  MoreVertical,
+  X,
+  User as UserIcon,
 } from "lucide-react";
+
+const avatarColorPalette = [
+  { bg: "bg-blue-100", text: "text-blue-700" },
+  { bg: "bg-rose-100", text: "text-rose-700" },
+  { bg: "bg-purple-100", text: "text-purple-700" },
+  { bg: "bg-amber-100", text: "text-amber-800" },
+  { bg: "bg-sky-100", text: "text-sky-800" },
+  { bg: "bg-emerald-100", text: "text-emerald-700" },
+  { bg: "bg-indigo-100", text: "text-indigo-700" },
+  { bg: "bg-teal-100", text: "text-teal-700" },
+];
+
+const getInitials = (name: string) => {
+  if (!name) return "SV";
+  const cleaned = name.replace(/^(HG|HH|Prabhu|Mataji)\s+/i, "");
+  const parts = cleaned.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  const originalParts = name.trim().split(/\s+/);
+  if (originalParts.length >= 2) {
+    return (originalParts[0][0] + originalParts[1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -40,12 +71,17 @@ export default function DashboardPage() {
     activeCourseTitle,
     activeBatchSummary,
     selectedCourse,
+    courses,
+    setWorkspace,
   } = useWorkspace();
 
   const { openPersonModal, openCallModal, openWhatsAppModal, refreshTrigger } = useContext(CRMContext);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedMonth, setSelectedMonth] = useState<string>("2026-10");
+  const [selectedCallerFilter, setSelectedCallerFilter] = useState<string>("ALL");
+  const [searchCallerQuery, setSearchCallerQuery] = useState<string>("");
+  const [showCallerSearch, setShowCallerSearch] = useState<boolean>(false);
   const [activeQueueTab, setActiveQueueTab] = useState<"today" | "callbacks" | "absentee">("today");
 
   // Calling Volunteer Journey: redirect directly to My Calling Desk
@@ -144,212 +180,340 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Header Banner & Monthly Filter Control - Compact on Mobile */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-[#B8860B]">
-            <span>🪷 Sri Sri Radha Govind Seva</span>
-            <span>•</span>
-            <span>Chandkheda Center</span>
+      {/* Top Center Identity & Avatar Header (Matches Admin Screenshot) */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-rose-50 to-amber-50 border border-rose-200/60 flex items-center justify-center text-xl shadow-2xs">
+            🪷
           </div>
-          <h2 className="text-lg sm:text-2xl font-serif font-bold text-[#08415C] mt-0.5 tracking-tight truncate">
-            Devotee Outreach & Relationship Cockpit
-          </h2>
-          {/* Subtle mobile active cohort indicator */}
-          <div className="md:hidden flex items-center gap-1.5 text-[11px] text-stone-500 font-medium mt-0.5 truncate">
-            <span className="font-semibold text-[#08415C] truncate">{activeCourseTitle}</span>
-            <span className="text-stone-300">•</span>
-            <span className="text-stone-600 truncate">{activeBatchSummary}</span>
+          <div>
+            <h1 className="text-xs sm:text-sm font-serif font-bold text-[#08415C] tracking-wide uppercase leading-tight">
+              Sri Sri Radha Govind Seva
+            </h1>
+            <p className="text-[10px] tracking-widest text-[#B8860B] font-semibold uppercase">
+              Chandkheda Center
+            </p>
           </div>
         </div>
 
-        {/* Monthly Filter Selector (Compact on mobile) */}
-        <div className="flex items-center self-start sm:self-auto flex-shrink-0">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 bg-white border border-[#E5D8B8] rounded-xl shadow-2xs text-[11px] sm:text-xs font-medium">
-            <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#08415C] flex-shrink-0" />
-            <span className="text-stone-400 hidden sm:inline">Period:</span>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent font-semibold text-[#08415C] outline-none text-[11px] sm:text-xs cursor-pointer"
-            >
-              {monthOptions.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
+        {/* User Avatar Circle on Top Right */}
+        {user && (
+          <div
+            onClick={() => router.push("/profile")}
+            className="flex items-center gap-1.5 bg-white border border-[#E5D8B8] pl-1 pr-2 py-1 rounded-full shadow-2xs cursor-pointer hover:border-[#08415C] transition"
+            title={`Logged in as ${user.name}`}
+          >
+            <div className="w-7 h-7 rounded-full bg-[#08415C] text-[#D4AF37] text-[11px] font-bold flex items-center justify-center shadow-2xs">
+              {getInitials(user.name || "Sevak")}
+            </div>
+            <span className="text-xs font-bold text-[#08415C] hidden sm:inline max-w-[100px] truncate">
+              {user.name?.split(" ")[0]}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+          </div>
+        )}
+      </div>
+
+      {/* COMPACT FILTER CONTROLS (Row 1: Calendar Month, Row 2: Caller + Batch) */}
+      <div className="space-y-2">
+        {/* Filter Row 1: Calendar Month */}
+        <div className="relative">
+          <div className="flex items-center justify-between w-full bg-white border border-[#E5D8B8] rounded-xl px-3 py-2 text-xs font-semibold text-stone-800 shadow-2xs hover:border-[#08415C]/40 transition">
+            <div className="flex items-center gap-2 flex-1">
+              <Calendar className="w-4 h-4 text-[#08415C] shrink-0" />
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-full bg-transparent outline-none cursor-pointer font-bold text-stone-800 text-xs"
+              >
+                {monthOptions.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <ChevronDown className="w-4 h-4 text-stone-400 pointer-events-none shrink-0" />
+          </div>
+        </div>
+
+        {/* Filter Row 2: All Callers (Left) & Batch (Right) */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Caller Filter */}
+          <div className="flex items-center justify-between bg-white border border-[#E5D8B8] rounded-xl px-2.5 py-2 text-xs font-semibold text-stone-800 shadow-2xs hover:border-[#08415C]/40 transition">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <UserIcon className="w-3.5 h-3.5 text-[#08415C] shrink-0" />
+              <select
+                value={selectedCallerFilter}
+                onChange={(e) => setSelectedCallerFilter(e.target.value)}
+                className="w-full bg-transparent outline-none cursor-pointer text-xs font-semibold text-stone-800 truncate"
+              >
+                <option value="ALL">All Callers</option>
+                {volunteerPerformance.map((v: any) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-stone-400 pointer-events-none shrink-0" />
+          </div>
+
+          {/* Batch Filter */}
+          <div className="flex items-center justify-between bg-white border border-[#E5D8B8] rounded-xl px-2.5 py-2 text-xs font-semibold text-stone-800 shadow-2xs hover:border-[#08415C]/40 transition">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <BookOpen className="w-3.5 h-3.5 text-[#08415C] shrink-0" />
+              <select
+                value={selectedBatchIds[0] || "ALL"}
+                onChange={(e) => {
+                  const bId = e.target.value;
+                  if (bId === "ALL") {
+                    setWorkspace(selectedCourseId, []);
+                  } else {
+                    const parentCourse = courses.find((c) => c.batches?.some((b) => b.id === bId));
+                    setWorkspace(parentCourse?.id || selectedCourseId, [bId]);
+                  }
+                }}
+                className="w-full bg-transparent outline-none cursor-pointer text-xs font-semibold text-stone-800 truncate"
+              >
+                <option value="ALL">All Batches</option>
+                {(selectedCourse?.batches && selectedCourse.batches.length > 0
+                  ? selectedCourse.batches
+                  : courses.flatMap((c) => c.batches || [])
+                ).map((b: any) => (
+                  <option key={b.id} value={b.id}>
+                    {b.batchName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-stone-400 pointer-events-none shrink-0" />
           </div>
         </div>
       </div>
 
-      {/* STEP 4 PRD: 6 SPECIFIC METRIC KPI CARDS - Compact & Simple on Mobile */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3.5">
-        {/* Metric 1: Total Contacts */}
+      {/* 4 COMPACT METRIC CARDS (2x2 Grid on Mobile, 4-Col on Desktop - Exact Match to Screenshot) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+        {/* Card 1: Total Contacts (Soft Pastel Blue) */}
         <Link
           href="/people"
-          className="gold-card p-2 sm:p-3.5 hover:border-[#08415C] transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-[#08415C]"
-          title="Total Contacts in workspace"
+          className="p-3 sm:p-4 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] hover:border-[#93C5FD] transition flex items-center justify-between group shadow-2xs cursor-pointer"
         >
-          <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
-              Total Contacts
-            </span>
-            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-[#08415C]/10 text-[#08415C] flex items-center justify-center flex-shrink-0">
-              <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#DBEAFE] text-[#2563EB] flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xl sm:text-2xl font-bold text-[#1E3A8A] leading-tight">
+                {currentStats.totalContacts ?? currentStats.totalPeople ?? 0}
+              </div>
+              <div className="text-[11px] sm:text-xs font-medium text-stone-500 truncate">
+                Total Contacts
+              </div>
             </div>
           </div>
-          <div className="my-0.5 sm:my-1.5">
-            <div className="text-lg sm:text-2xl font-serif font-bold text-[#08415C]">
-              {currentStats.totalContacts ?? currentStats.totalPeople ?? 0}
-            </div>
-            <div className="text-[10px] text-stone-500 hidden sm:block">In this workspace</div>
-          </div>
-          <div className="text-[10px] text-[#08415C] font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-            <span>View contacts</span>
-            <ArrowRight className="w-2.5 h-2.5" />
-          </div>
+          <ChevronRight className="w-4 h-4 text-[#3B82F6] group-hover:translate-x-0.5 transition-transform shrink-0" />
         </Link>
 
-        {/* Metric 2: Total Assigned Contacts */}
+        {/* Card 2: Calls Done (Soft Pastel Green) */}
         <Link
-          href="/calling-sewa"
-          className="gold-card p-2 sm:p-3.5 hover:border-[#00A896] transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-[#00A896]"
-          title="Contacts assigned to volunteers"
+          href="/calling-sewa?tab=calls_done"
+          className="p-3 sm:p-4 rounded-2xl bg-[#F0FDF4] border border-[#BBF7D0] hover:border-[#86EFAC] transition flex items-center justify-between group shadow-2xs cursor-pointer"
         >
-          <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
-              Assigned
-            </span>
-            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-emerald-50 text-[#00A896] flex items-center justify-center flex-shrink-0">
-              <UserCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#DCFCE7] text-[#16A34A] flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xl sm:text-2xl font-bold text-[#14532D] leading-tight">
+                {currentStats.callsCompleted || 0}
+              </div>
+              <div className="text-[11px] sm:text-xs font-medium text-stone-500 truncate">
+                Calls Done
+              </div>
             </div>
           </div>
-          <div className="my-0.5 sm:my-1.5">
-            <div className="text-lg sm:text-2xl font-serif font-bold text-[#00A896]">
-              {currentStats.totalAssignedContacts || 0}
-            </div>
-            <div className="text-[10px] text-stone-500 hidden sm:block">Allocated callers</div>
-          </div>
-          <div className="text-[10px] text-[#00A896] font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-            <span>Assign calls</span>
-            <ArrowRight className="w-2.5 h-2.5" />
-          </div>
+          <ChevronRight className="w-4 h-4 text-[#22C55E] group-hover:translate-x-0.5 transition-transform shrink-0" />
         </Link>
 
-        {/* Metric 3: Total Pending Calls */}
+        {/* Card 3: To Call (Soft Pastel Orange/Amber) */}
         <Link
-          href="/calling-sewa"
-          className="gold-card p-2 sm:p-3.5 hover:border-[#D4AF37] transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-[#D4AF37]"
-          title="Total pending follow-up calls"
+          href="/calling-sewa?tab=calling"
+          className="p-3 sm:p-4 rounded-2xl bg-[#FFFBEB] border border-[#FDE68A] hover:border-[#FCD34D] transition flex items-center justify-between group shadow-2xs cursor-pointer"
         >
-          <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
-              Pending Calls
-            </span>
-            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-[#FAF5E6] text-[#B8860B] flex items-center justify-center flex-shrink-0">
-              <PhoneCall className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0">
+              <PhoneCall className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xl sm:text-2xl font-bold text-[#78350F] leading-tight">
+                {currentStats.totalPendingCalls ?? currentStats.callsPending ?? 0}
+              </div>
+              <div className="text-[11px] sm:text-xs font-medium text-stone-500 truncate">
+                To Call
+              </div>
             </div>
           </div>
-          <div className="my-0.5 sm:my-1.5">
-            <div className="text-lg sm:text-2xl font-serif font-bold text-[#08415C]">
-              {currentStats.totalPendingCalls ?? currentStats.callsPending ?? 0}
-            </div>
-            <div className="text-[10px] text-stone-500 hidden sm:block">Calls due</div>
-          </div>
-          <div className="text-[10px] text-[#B8860B] font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-            <span>Calling desk</span>
-            <ArrowRight className="w-2.5 h-2.5" />
-          </div>
+          <ChevronRight className="w-4 h-4 text-[#F59E0B] group-hover:translate-x-0.5 transition-transform shrink-0" />
         </Link>
 
-        {/* Metric 4: Today's Follow-ups */}
+        {/* Card 4: Callers (Soft Pastel Purple) */}
         <Link
-          href="/todays-work"
-          className="gold-card p-2 sm:p-3.5 hover:border-indigo-600 transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-indigo-600"
-          title="Follow-ups due today"
+          href="/volunteers"
+          className="p-3 sm:p-4 rounded-2xl bg-[#FAF5FF] border border-[#E9D5FF] hover:border-[#D8B4FE] transition flex items-center justify-between group shadow-2xs cursor-pointer"
         >
-          <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
-              Today's Calls
-            </span>
-            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center flex-shrink-0">
-              <CheckSquare className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#F3E8FF] text-[#9333EA] flex items-center justify-center shrink-0">
+              <UserIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xl sm:text-2xl font-bold text-[#581C87] leading-tight">
+                {volunteerPerformance.length}
+              </div>
+              <div className="text-[11px] sm:text-xs font-medium text-stone-500 truncate">
+                Callers
+              </div>
             </div>
           </div>
-          <div className="my-0.5 sm:my-1.5">
-            <div className="text-lg sm:text-2xl font-serif font-bold text-indigo-900">
-              {currentStats.todayFollowups || 0}
-            </div>
-            <div className="text-[10px] text-stone-500 hidden sm:block">Due today</div>
-          </div>
-          <div className="text-[10px] text-indigo-700 font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-            <span>Today's work</span>
-            <ArrowRight className="w-2.5 h-2.5" />
-          </div>
-        </Link>
-
-        {/* Metric 5: Interested Devotees */}
-        <Link
-          href="/people?filter=interested"
-          className="gold-card p-2 sm:p-3.5 hover:border-amber-600 transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-amber-500"
-          title="Interested Devotees"
-        >
-          <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
-              Interested
-            </span>
-            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
-              <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-            </div>
-          </div>
-          <div className="my-0.5 sm:my-1.5">
-            <div className="text-lg sm:text-2xl font-serif font-bold text-amber-700">
-              {currentStats.interestedDevotees || 0}
-            </div>
-            <div className="text-[10px] text-stone-500 hidden sm:block">Positive responses</div>
-          </div>
-          <div className="text-[10px] text-amber-700 font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-            <span>View seekers</span>
-            <ArrowRight className="w-2.5 h-2.5" />
-          </div>
-        </Link>
-
-        {/* Metric 6: Registered Devotees */}
-        <Link
-          href="/courses"
-          className="gold-card p-2 sm:p-3.5 hover:border-[#08415C] transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-[#08415C]"
-          title="Registered Devotees in course"
-        >
-          <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
-              Registered
-            </span>
-            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-[#08415C]/10 text-[#08415C] flex items-center justify-center flex-shrink-0">
-              <GraduationCap className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-            </div>
-          </div>
-          <div className="my-0.5 sm:my-1.5">
-            <div className="text-lg sm:text-2xl font-serif font-bold text-[#08415C]">
-              {currentStats.registeredDevotees || 0}
-            </div>
-            <div className="text-[10px] text-stone-500 hidden sm:block">Enrolled devotees</div>
-          </div>
-          <div className="text-[10px] text-[#08415C] font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-            <span>Course roster</span>
-            <ArrowRight className="w-2.5 h-2.5" />
-          </div>
+          <ChevronRight className="w-4 h-4 text-[#A855F7] group-hover:translate-x-0.5 transition-transform shrink-0" />
         </Link>
       </div>
 
-      {/* STEP 4 PRD: BATCH-WISE PERFORMANCE & VOLUNTEER-WISE PERFORMANCE SECTIONS */}
+      {/* DEVOTEE CALL LIST WITH LIVE PROGRESS BARS (Matches Admin Screenshot) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="font-serif font-bold text-sm sm:text-base text-[#08415C]">
+            Devotee Call List ({volunteerPerformance.length})
+          </h3>
+
+          <div className="flex items-center gap-1.5">
+            {showCallerSearch ? (
+              <div className="flex items-center gap-1 bg-white border border-[#E5D8B8] rounded-xl px-2 py-1 shadow-2xs animate-fadeIn">
+                <Search className="w-3.5 h-3.5 text-stone-400" />
+                <input
+                  type="text"
+                  value={searchCallerQuery}
+                  onChange={(e) => setSearchCallerQuery(e.target.value)}
+                  placeholder="Search caller..."
+                  className="text-xs outline-none w-28 sm:w-36 text-stone-800"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchCallerQuery("");
+                    setShowCallerSearch(false);
+                  }}
+                  className="text-stone-400 hover:text-stone-600 p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowCallerSearch(true)}
+                className="p-1.5 bg-white hover:bg-stone-50 border border-[#E5D8B8] rounded-xl text-stone-600 shadow-2xs transition"
+                title="Search callers"
+              >
+                <Search className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Compact Caller Progress Cards */}
+        <div className="space-y-2">
+          {volunteerPerformance
+            .filter((v: any) => {
+              if (selectedCallerFilter !== "ALL" && v.id !== selectedCallerFilter) return false;
+              if (searchCallerQuery) {
+                return v.name.toLowerCase().includes(searchCallerQuery.toLowerCase());
+              }
+              return true;
+            })
+            .map((vol: any, idx: number) => {
+              const color = avatarColorPalette[idx % avatarColorPalette.length];
+              const initials = getInitials(vol.name);
+              const total = (vol.completedCalls || 0) + (vol.pendingCalls || 0);
+              const percent = total > 0 ? Math.round(((vol.completedCalls || 0) / total) * 100) : 0;
+
+              return (
+                <div
+                  key={vol.id}
+                  className="p-3 sm:p-3.5 bg-white border border-stone-200/80 rounded-2xl shadow-2xs hover:border-[#08415C]/40 transition flex items-center justify-between gap-3 group"
+                >
+                  {/* Left: Avatar Circle with Initials */}
+                  <div
+                    className={`w-10 h-10 rounded-full ${color.bg} ${color.text} font-bold text-xs sm:text-sm flex items-center justify-center shrink-0 shadow-2xs`}
+                  >
+                    {initials}
+                  </div>
+
+                  {/* Center: Name, Stats, Progress Bar */}
+                  <div className="flex-1 min-w-0">
+                    <h4
+                      className="font-bold text-xs sm:text-sm text-stone-800 truncate cursor-pointer hover:text-[#08415C]"
+                      onClick={() => router.push(`/calling-sewa?volunteerId=${vol.id}`)}
+                    >
+                      {vol.name}
+                    </h4>
+
+                    <div className="text-[11px] text-stone-500 mt-0.5 flex items-center gap-1.5">
+                      <span>
+                        <strong className="text-blue-600 font-bold">{vol.pendingCalls || 0}</strong> to call
+                      </span>
+                      <span className="text-stone-300">•</span>
+                      <span>
+                        <strong className="text-emerald-600 font-bold">{vol.completedCalls || 0}</strong> done
+                      </span>
+                    </div>
+
+                    {/* Progress Bar with Percentage */}
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <div className="flex-1 h-2 bg-stone-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] font-bold text-stone-500 min-w-[30px] text-right">
+                        {percent}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right: 3-dots action icon */}
+                  <div className="shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/calling-sewa?volunteerId=${vol.id}`)}
+                      className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition"
+                      title={`Open calling queue for ${vol.name}`}
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+          {volunteerPerformance.length === 0 && (
+            <div className="p-8 text-center text-xs text-stone-400 bg-white rounded-2xl border border-stone-200">
+              No callers found in this workspace.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* STEP 4 PRD: BATCH-WISE PERFORMANCE SECTION (Collapsible / Secondary) */}
       {batchPerformance.length > 0 && (
-        <div className="gold-card p-4 sm:p-5 space-y-3.5">
+        <div className="gold-card p-3.5 sm:p-5 space-y-3.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5D8B8]/70 pb-3">
             <div>
-              <h3 className="font-serif font-bold text-base sm:text-lg text-[#08415C] flex items-center gap-2">
+              <h3 className="font-serif font-bold text-base text-[#08415C] flex items-center gap-2">
                 <Layers className="w-4 h-4 text-[#00A896]" />
-                <span>Batch-Wise Performance (Step 4)</span>
+                <span>Batch-Wise Performance</span>
               </h3>
               <p className="text-xs text-stone-500">
                 Performance indicators across batches in {activeCourseTitle}
@@ -396,61 +560,6 @@ export default function DashboardPage() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* VOLUNTEER-WISE PERFORMANCE SECTION (PRD STEP 4) */}
-      {volunteerPerformance.length > 0 && (
-        <div className="gold-card p-4 sm:p-5 space-y-3.5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5D8B8]/70 pb-3">
-            <div>
-              <h3 className="font-serif font-bold text-base sm:text-lg text-[#08415C] flex items-center gap-2">
-                <Users className="w-4 h-4 text-[#D4AF37]" />
-                <span>Volunteer-Wise Performance (Step 4)</span>
-              </h3>
-              <p className="text-xs text-stone-500">
-                Calling output, assigned contacts, and positive responses per volunteer
-              </p>
-            </div>
-            <Link
-              href="/volunteers"
-              className="text-xs font-semibold text-[#08415C] hover:underline flex items-center gap-1"
-            >
-              <span>Manage volunteers</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#FAF8F5] text-stone-600 font-semibold border-b border-[#E5D8B8]">
-                <tr>
-                  <th className="py-2.5 px-3">Volunteer</th>
-                  <th className="py-2.5 px-3">Role</th>
-                  <th className="py-2.5 px-3 text-center">Assigned Contacts</th>
-                  <th className="py-2.5 px-3 text-center">Calls Made</th>
-                  <th className="py-2.5 px-3 text-center">Pending Calls</th>
-                  <th className="py-2.5 px-3 text-center">Interested / Will Attend</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {volunteerPerformance.map((v: any) => (
-                  <tr key={v.id} className="hover:bg-stone-50 transition">
-                    <td className="py-2.5 px-3 font-semibold text-stone-900">{v.name}</td>
-                    <td className="py-2.5 px-3 text-stone-500 text-[11px]">{v.role?.replace(/_/g, " ")}</td>
-                    <td className="py-2.5 px-3 text-center font-bold text-stone-800">{v.assignedCount}</td>
-                    <td className="py-2.5 px-3 text-center font-bold text-emerald-700">{v.completedCalls}</td>
-                    <td className="py-2.5 px-3 text-center font-bold text-amber-700">{v.pendingCalls}</td>
-                    <td className="py-2.5 px-3 text-center font-bold text-[#08415C]">
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800">
-                        {v.positiveResponses} Devotees
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       )}

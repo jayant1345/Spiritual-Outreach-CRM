@@ -205,7 +205,7 @@ export async function GET(request: Request) {
       if (targetPersonIds !== null) {
         vPendingWhere.personId = { in: targetPersonIds };
       }
-      const vPendingCalls = await prisma.followupTask.count({ where: vPendingWhere });
+      const vPendingTasks = await prisma.followupTask.count({ where: vPendingWhere });
 
       const vCallLogWhere: any = { volunteerId: v.id };
       if (targetPersonIds !== null) {
@@ -220,13 +220,16 @@ export async function GET(request: Request) {
         },
       });
 
+      // Pending calls = uncalled assigned contacts or pending tasks
+      const pendingCalls = assignedCount > vCompletedCalls ? (assignedCount - vCompletedCalls) : vPendingTasks;
+
       volunteerPerformance.push({
         id: v.id,
         name: v.name,
         role: v.role,
         assignedCount,
         completedCalls: vCompletedCalls,
-        pendingCalls: vPendingCalls,
+        pendingCalls,
         positiveResponses,
       });
     }
