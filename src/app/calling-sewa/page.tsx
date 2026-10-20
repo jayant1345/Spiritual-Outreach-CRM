@@ -919,7 +919,7 @@ export default function CallingSewaPage() {
 
                       {/* Circular Avatar */}
                       <div
-                        onClick={() => openPersonModal(person.id)}
+                        onClick={() => openPersonModal(person.id, filteredPeople.map((p) => p.id))}
                         className="cursor-pointer flex-shrink-0"
                         title="Click to view devotee profile"
                       >
@@ -943,7 +943,7 @@ export default function CallingSewaPage() {
                     <div className="flex-1 min-w-0 pr-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span
-                          onClick={() => openPersonModal(person.id)}
+                          onClick={() => openPersonModal(person.id, filteredPeople.map((p) => p.id))}
                           className="font-bold text-[13px] sm:text-[15px] text-stone-900 leading-tight hover:text-[#08415C] hover:underline cursor-pointer truncate max-w-full"
                         >
                           {person.fullName}
@@ -1044,7 +1044,7 @@ export default function CallingSewaPage() {
                                 type="button"
                                 onClick={() => {
                                   setMenuPersonId(null);
-                                  openPersonModal(person.id);
+                                  openPersonModal(person.id, filteredPeople.map((p) => p.id));
                                 }}
                                 className="w-full px-3 py-1.5 hover:bg-stone-50 flex items-center gap-2"
                               >

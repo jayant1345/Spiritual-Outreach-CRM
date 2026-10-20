@@ -13,7 +13,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 
 export const CRMContext = React.createContext<{
-  openPersonModal: (id: string) => void;
+  openPersonModal: (id: string, queue?: string[]) => void;
   openCallModal: (person: any) => void;
   openWhatsAppModal: (person: any) => void;
   openAddPersonModal: () => void;
@@ -37,6 +37,7 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
   const [selectedPersonForCall, setSelectedPersonForCall] = useState<any>(null);
   const [selectedPersonForWhatsApp, setSelectedPersonForWhatsApp] = useState<any>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [personQueue, setPersonQueue] = useState<string[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -76,7 +77,10 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
   return (
     <CRMContext.Provider
       value={{
-        openPersonModal: (id) => setSelectedPersonId(id),
+        openPersonModal: (id, queue) => {
+          setSelectedPersonId(id);
+          setPersonQueue(queue && Array.isArray(queue) ? queue : []);
+        },
         openCallModal: (person) => setSelectedPersonForCall(person),
         openWhatsAppModal: (person) => setSelectedPersonForWhatsApp(person),
         openAddPersonModal: () => setIsAddPersonOpen(true),
@@ -144,8 +148,13 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
 
         <PersonModal
           isOpen={!!selectedPersonId}
-          onClose={() => setSelectedPersonId(null)}
+          onClose={() => {
+            setSelectedPersonId(null);
+            setPersonQueue([]);
+          }}
           personId={selectedPersonId}
+          personIdsList={personQueue}
+          onNavigatePerson={(newId) => setSelectedPersonId(newId)}
           onOpenCallModal={(p) => {
             setSelectedPersonId(null);
             setSelectedPersonForCall(p);
@@ -154,6 +163,7 @@ function AuthenticatedAppShell({ children }: { children: React.ReactNode }) {
             setSelectedPersonId(null);
             setSelectedPersonForWhatsApp(p);
           }}
+          onPersonUpdated={triggerRefresh}
         />
       </div>
     </CRMContext.Provider>

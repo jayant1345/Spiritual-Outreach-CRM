@@ -25,6 +25,9 @@ import {
   FileText,
   PhoneCall,
   Save,
+  ChevronLeft,
+  ChevronRight,
+  Users,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -32,6 +35,8 @@ interface PersonModalProps {
   isOpen: boolean;
   onClose: () => void;
   personId: string | null;
+  personIdsList?: string[];
+  onNavigatePerson?: (newPersonId: string) => void;
   onOpenCallModal: (person: any) => void;
   onOpenWhatsAppModal: (person: any) => void;
   onPersonUpdated?: () => void;
@@ -41,6 +46,8 @@ export const PersonModal: React.FC<PersonModalProps> = ({
   isOpen,
   onClose,
   personId,
+  personIdsList,
+  onNavigatePerson,
   onOpenCallModal,
   onOpenWhatsAppModal,
   onPersonUpdated,
@@ -48,6 +55,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
   const { hasPermission } = useAuth();
   const [person, setPerson] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [fallbackQueue, setFallbackQueue] = useState<string[]>([]);
 
   // Edit Mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -70,6 +78,76 @@ export const PersonModal: React.FC<PersonModalProps> = ({
   const [isEnrollingCourse, setIsEnrollingCourse] = useState(false);
   const [selectedEnrollBatchId, setSelectedEnrollBatchId] = useState("");
   const [enrollingLoading, setEnrollingLoading] = useState(false);
+
+  // If no queue is provided externally, fetch people list from API to provide seamless Next/Prev
+  useEffect(() => {
+    if (isOpen && (!personIdsList || personIdsList.length === 0)) {
+      fetch("/api/people")
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setFallbackQueue(data.map((p: any) => p.id));
+          }
+        })
+        .catch((err) => console.error("Error loading fallback queue:", err));
+    }
+  }, [isOpen, personIdsList]);
+
+  const queue = personIdsList && personIdsList.length > 0 ? personIdsList : fallbackQueue;
+  const currentIndex = personId ? queue.indexOf(personId) : -1;
+  const hasPrevious = currentIndex > 0;
+  const hasNext = currentIndex >= 0 && currentIndex < queue.length - 1;
+
+  const handlePrevious = () => {
+    if (hasPrevious && onNavigatePerson) {
+      onNavigatePerson(queue[currentIndex - 1]);
+    }
+  };
+
+  const handleNext = () => {
+    if (hasNext && onNavigatePerson) {
+      onNavigatePerson(queue[currentIndex + 1]);
+    }
+  };
+
+  // Keyboard navigation: Left Arrow (←) for previous, Right Arrow (→) for next
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft" && hasPrevious) {
+        e.preventDefault();
+        handlePrevious();
+      } else if (e.key === "ArrowRight" && hasNext) {
+        e.preventDefault();
+        handleNext();
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, hasPrevious, hasNext, currentIndex, queue]);
+
+  const getPersonPhoto = (p: any): string | null => {
+    if (!p) return null;
+    if (p.photoUrl) return p.photoUrl;
+    if (p.customData) {
+      try {
+        const parsed = typeof p.customData === "string" ? JSON.parse(p.customData) : p.customData;
+        return parsed.photoUrl || parsed.photo || null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
 
   useEffect(() => {
     if (isOpen && personId) {
@@ -310,6 +388,37 @@ export const PersonModal: React.FC<PersonModalProps> = ({
       title={person ? person.fullName : "Member Profile"}
       subtitle={person ? `360° Devotee Journey Dossier • ${person.area || "Chandkheda"}` : "Loading 360° Profile..."}
       maxWidth="5xl"
+      headerAction={
+        queue.length > 1 ? (
+          <div className="flex items-center gap-1 bg-white border border-[#E5D8B8] rounded-xl p-1 shadow-2xs mr-1">
+            <button
+              type="button"
+              disabled={!hasPrevious}
+              onClick={handlePrevious}
+              className="p-1 sm:px-2.5 sm:py-1 rounded-lg text-stone-700 hover:text-[#08415C] hover:bg-[#FAF8F5] disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center gap-1 text-xs font-bold"
+              title="Previous Contact (←)"
+            >
+              <ChevronLeft className="w-4 h-4 text-[#08415C]" />
+              <span className="hidden sm:inline">Prev</span>
+            </button>
+
+            <span className="text-[11px] font-mono font-bold text-stone-600 px-1.5 select-none">
+              {currentIndex >= 0 ? currentIndex + 1 : 1}/{queue.length}
+            </span>
+
+            <button
+              type="button"
+              disabled={!hasNext}
+              onClick={handleNext}
+              className="p-1 sm:px-2.5 sm:py-1 rounded-lg bg-[#08415C] hover:bg-[#0B4F6C] text-white disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center gap-1 text-xs font-bold shadow-2xs"
+              title="Next Contact (→)"
+            >
+              <span className="hidden sm:inline">Next</span>
+              <ChevronRight className="w-4 h-4 text-[#D4AF37]" />
+            </button>
+          </div>
+        ) : null
+      }
     >
       {loading || !person ? (
         <div className="py-16 text-center text-[#78909C]">
@@ -318,12 +427,54 @@ export const PersonModal: React.FC<PersonModalProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Quick Contact Switcher Banner for Callers */}
+          {queue.length > 1 && (
+            <div className="bg-gradient-to-r from-[#FAF8F5] via-[#FFFDF7] to-[#FAF8F5] border border-[#E5D8B8] rounded-2xl p-2.5 px-3 sm:px-4 flex items-center justify-between shadow-2xs">
+              <button
+                type="button"
+                disabled={!hasPrevious}
+                onClick={handlePrevious}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 hover:text-[#08415C] disabled:opacity-35 disabled:cursor-not-allowed font-semibold text-xs transition shadow-2xs"
+              >
+                <ChevronLeft className="w-4 h-4 text-[#08415C]" />
+                <span>Previous Contact</span>
+              </button>
+
+              <div className="flex items-center gap-2 text-stone-700 font-medium text-xs">
+                <span className="bg-[#E5D8B8]/30 px-2.5 py-1 rounded-full font-bold text-[#08415C] text-xs">
+                  Contact {currentIndex >= 0 ? currentIndex + 1 : 1} of {queue.length}
+                </span>
+                <span className="text-[11px] text-stone-400 hidden md:inline">
+                  (Keyboard: ← Previous | Next →)
+                </span>
+              </div>
+
+              <button
+                type="button"
+                disabled={!hasNext}
+                onClick={handleNext}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#08415C] hover:bg-[#0B4F6C] text-white disabled:opacity-35 disabled:cursor-not-allowed font-semibold text-xs transition shadow-2xs"
+              >
+                <span>Next Contact</span>
+                <ChevronRight className="w-4 h-4 text-[#D4AF37]" />
+              </button>
+            </div>
+          )}
+
           {/* Top Header Card with Actions */}
           <div className="p-3.5 sm:p-4 bg-[#FAF8F5] border border-[#E5D8B8] rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-[#08415C] text-[#D4AF37] font-serif text-lg font-bold flex items-center justify-center border-2 border-[#D4AF37]/50 shadow-xs flex-shrink-0">
-                {person.fullName.split(" ").map((n: string) => n[0]).join("")}
-              </div>
+              {getPersonPhoto(person) ? (
+                <img
+                  src={getPersonPhoto(person)!}
+                  alt={person.fullName}
+                  className="w-12 h-12 rounded-2xl object-cover border-2 border-[#D4AF37]/50 shadow-xs flex-shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-[#08415C] text-[#D4AF37] font-serif text-lg font-bold flex items-center justify-center border-2 border-[#D4AF37]/50 shadow-xs flex-shrink-0">
+                  {person.fullName.split(" ").map((n: string) => n[0]).join("")}
+                </div>
+              )}
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="text-lg font-serif font-bold text-[#08415C]">
