@@ -157,6 +157,7 @@ export async function POST(request: Request) {
       japaDailyRounds,
       spiritualMentor,
       customData,
+      photoUrl,
       courseId,
       batchId,
     } = body;
@@ -169,6 +170,14 @@ export async function POST(request: Request) {
     }
 
     const defaultVolunteerId = assignedVolunteerId || (currentUser?.role === "CALLING_VOLUNTEER" ? currentUser.id : null);
+
+    let finalCustomData: any = null;
+    if (customData) {
+      finalCustomData = typeof customData === "object" ? customData : JSON.parse(customData);
+    }
+    if (photoUrl) {
+      finalCustomData = { ...(finalCustomData || {}), photoUrl };
+    }
 
     const person = await prisma.person.create({
       data: {
@@ -188,7 +197,7 @@ export async function POST(request: Request) {
         address,
         japaDailyRounds: japaDailyRounds ? parseInt(japaDailyRounds) : 0,
         spiritualMentor,
-        customData: customData ? JSON.stringify(customData) : null,
+        customData: finalCustomData ? JSON.stringify(finalCustomData) : null,
       },
     });
 

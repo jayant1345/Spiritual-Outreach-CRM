@@ -22,10 +22,58 @@ import {
   Filter,
   User as UserIcon,
   Layers,
+  Search,
+  MoreVertical,
+  MapPin,
+  X,
+  ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getOutcomeConfig } from "@/components/calling/CallActionModal";
 import AssignMultipleModal from "@/components/calling/AssignMultipleModal";
+
+const AVATAR_PALETTES = [
+  { bg: "bg-[#FCE7F3]", text: "text-[#BE185D]" }, // Rose/Pink (like BJ)
+  { bg: "bg-[#D1FAE5]", text: "text-[#047857]" }, // Mint/Green (like HS)
+  { bg: "bg-[#DBEAFE]", text: "text-[#1D4ED8]" }, // Blue (like HP)
+  { bg: "bg-[#FEF3C7]", text: "text-[#B45309]" }, // Amber/Yellow (like AJ)
+  { bg: "bg-[#F3E8FF]", text: "text-[#7E22CE]" }, // Purple (like HB)
+  { bg: "bg-[#FFE4E6]", text: "text-[#E11D48]" }, // Rose (like HM)
+  { bg: "bg-[#CCFBF1]", text: "text-[#0F766E]" }, // Teal
+  { bg: "bg-[#FFEDD5]", text: "text-[#C2410C]" }, // Orange
+];
+
+const getInitials = (name: string) => {
+  if (!name) return "DV";
+  const cleaned = name.replace(/^(HG|HH|Prabhu|Mataji)\s+/i, "").trim();
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  if (parts.length === 1 && parts[0].length >= 2) return parts[0].substring(0, 2).toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+};
+
+const getAvatarColor = (name: string) => {
+  if (!name) return AVATAR_PALETTES[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_PALETTES.length;
+  return AVATAR_PALETTES[index];
+};
+
+const getPersonPhoto = (person: any): string | null => {
+  if (person.photoUrl) return person.photoUrl;
+  if (person.customData) {
+    try {
+      const parsed = typeof person.customData === "string" ? JSON.parse(person.customData) : person.customData;
+      return parsed.photoUrl || parsed.photo || null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
 
 export default function CallingSewaPage() {
   const { openPersonModal, openCallModal, openWhatsAppModal, refreshTrigger } = useContext(CRMContext);
@@ -33,6 +81,11 @@ export default function CallingSewaPage() {
 
   const [activeTab, setActiveTab] = useState<"calling" | "calls_done" | "relationship" | "followups">("calling");
   const [toCallFilter, setToCallFilter] = useState<"ALL" | "ASSIGNED" | "UNASSIGNED" | "PENDING" | "COMPLETED">("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortOption, setSortOption] = useState<string>("name-asc");
+  const [showFilters, setShowFilters] = useState(false);
+  const [menuPersonId, setMenuPersonId] = useState<string | null>(null);
+
   const [people, setPeople] = useState<any[]>([]);
   const [callLogs, setCallLogs] = useState<any[]>([]);
   const [followups, setFollowups] = useState<any[]>([]);
@@ -209,18 +262,47 @@ export default function CallingSewaPage() {
     return callLogs.find((c) => c.personId === person.id || c.person?.id === person.id);
   };
 
-  // Filtered devotees for To Call list
-  const filteredPeople = people.filter((person) => {
-    const isAssigned = !!person.assignedVolunteerId || !!person.assignedVolunteer;
-    const latestCall = getLatestCallForPerson(person);
-    const isCompleted = !!latestCall;
+  // Filtered & sorted devotees for To Call list
+  const filteredPeople = people
+    .filter((person) => {
+      const isAssigned = !!person.assignedVolunteerId || !!person.assignedVolunteer;
+      const latestCall = getLatestCallForPerson(person);
+      const isCompleted = !!latestCall;
 
-    if (toCallFilter === "ASSIGNED") return isAssigned;
-    if (toCallFilter === "UNASSIGNED") return !isAssigned;
-    if (toCallFilter === "PENDING") return !isCompleted;
-    if (toCallFilter === "COMPLETED") return isCompleted;
-    return true;
-  });
+      if (toCallFilter === "ASSIGNED") return isAssigned;
+      if (toCallFilter === "UNASSIGNED") return !isAssigned;
+      if (toCallFilter === "PENDING") return !isCompleted;
+      if (toCallFilter === "COMPLETED") return isCompleted;
+      return true;
+    })
+    .filter((person) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      const nameMatch = person.fullName?.toLowerCase().includes(q);
+      const phoneMatch = person.mobile?.includes(q);
+      const areaMatch = person.area?.toLowerCase().includes(q);
+      const tagMatch = person.tags?.toLowerCase().includes(q);
+      const callerMatch = person.assignedVolunteer?.name?.toLowerCase().includes(q);
+      return nameMatch || phoneMatch || areaMatch || tagMatch || callerMatch;
+    })
+    .sort((a, b) => {
+      if (sortOption === "name-asc") {
+        return (a.fullName || "").localeCompare(b.fullName || "");
+      }
+      if (sortOption === "name-desc") {
+        return (b.fullName || "").localeCompare(a.fullName || "");
+      }
+      if (sortOption === "pending-first") {
+        const aDone = !!getLatestCallForPerson(a);
+        const bDone = !!getLatestCallForPerson(b);
+        if (aDone === bDone) return (a.fullName || "").localeCompare(b.fullName || "");
+        return aDone ? 1 : -1;
+      }
+      if (sortOption === "recent") {
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      }
+      return 0;
+    });
 
   const assignedCount = people.filter((p) => !!p.assignedVolunteerId || !!p.assignedVolunteer).length;
   const unassignedCount = people.length - assignedCount;
@@ -604,117 +686,173 @@ export default function CallingSewaPage() {
 
       {/* TAB CONTENT 1: To Call / Allocated Queue */}
       {(activeTab === "calling" || activeTab === "relationship") && (
-        <div className="gold-card p-3.5 sm:p-5 space-y-3.5 shadow-xs">
-          {/* Section Sub-header & Filter Pills */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs text-stone-500 pb-2 border-b border-stone-100 gap-2">
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Select All Checkbox */}
-              <label className="flex items-center gap-1.5 cursor-pointer font-bold text-stone-700 select-none py-1 px-2 rounded-lg hover:bg-stone-100 transition">
+        <div className="gold-card p-3 sm:p-4 space-y-3 shadow-xs">
+          {/* 1. Search Bar & Filters Toggle (matches admin screenshot) */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name or number..."
+                className="w-full pl-9 pr-8 py-2.5 bg-white border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#08415C]/20 focus:border-[#08415C] placeholder:text-stone-400 shadow-2xs"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs whitespace-nowrap ${
+                showFilters || toCallFilter !== "ALL" || selectedCampaign !== "ALL"
+                  ? "bg-[#08415C] text-white border-[#08415C]"
+                  : "bg-white text-stone-700 border-stone-200 hover:bg-stone-50"
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>Filters</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showFilters ? "rotate-180" : ""}`} />
+            </button>
+          </div>
+
+          {/* Collapsible / Expandable Filter Options */}
+          {showFilters && (
+            <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#E5D8B8] space-y-2.5 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between text-xs text-stone-600 flex-wrap gap-2">
+                <span className="font-bold text-stone-700">Filter By Status:</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setToCallFilter("ALL")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                      toCallFilter === "ALL"
+                        ? "bg-[#08415C] text-white shadow-xs"
+                        : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
+                    }`}
+                  >
+                    All ({people.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setToCallFilter("ASSIGNED")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
+                      toCallFilter === "ASSIGNED"
+                        ? "bg-[#00A896] text-white shadow-xs"
+                        : "bg-white text-[#007F70] border border-emerald-200 hover:bg-emerald-50"
+                    }`}
+                  >
+                    <UserCheck className="w-3 h-3" />
+                    <span>Assigned ({assignedCount})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setToCallFilter("UNASSIGNED")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
+                      toCallFilter === "UNASSIGNED"
+                        ? "bg-amber-600 text-white shadow-xs"
+                        : "bg-white text-amber-800 border border-amber-200 hover:bg-amber-50"
+                    }`}
+                  >
+                    <UserX className="w-3 h-3" />
+                    <span>Unassigned ({unassignedCount})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setToCallFilter("PENDING")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
+                      toCallFilter === "PENDING"
+                        ? "bg-[#08415C] text-white shadow-xs"
+                        : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
+                    }`}
+                  >
+                    <span>To Call ({pendingCallsCount})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setToCallFilter("COMPLETED")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
+                      toCallFilter === "COMPLETED"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50"
+                    }`}
+                  >
+                    <span>Completed ({completedCallsCount})</span>
+                  </button>
+                </div>
+              </div>
+
+              {availableCampaigns.length > 0 && (
+                <div className="flex items-center gap-2 pt-1 border-t border-stone-200/60 text-xs">
+                  <span className="font-bold text-stone-700">Course / Batch:</span>
+                  <select
+                    value={selectedCampaign}
+                    onChange={(e) => setSelectedCampaign(e.target.value)}
+                    className="p-1.5 border border-stone-200 rounded-lg bg-white text-xs text-stone-700 outline-none"
+                  >
+                    <option value="ALL">All Batches</option>
+                    {availableCampaigns.map((camp) => (
+                      <option key={camp} value={camp}>
+                        {camp}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 2. Sub-bar: Devotees Count + Select All & Sort Dropdown (matches admin screenshot) */}
+          <div className="flex items-center justify-between text-xs text-stone-600 pt-0.5 pb-0.5">
+            <div className="flex items-center gap-2.5">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-stone-800 select-none">
                 <input
                   type="checkbox"
                   checked={filteredPeople.length > 0 && selectedIds.length === filteredPeople.length}
                   onChange={handleSelectAll}
                   className="w-4 h-4 rounded accent-[#08415C] cursor-pointer"
                 />
-                <span>Select All ({filteredPeople.length})</span>
+                <span className="text-[13px]">{filteredPeople.length} Devotees</span>
               </label>
 
               {selectedIds.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setIsAssignMultipleOpen(true)}
-                  className="px-2.5 py-1 bg-[#08415C] hover:bg-[#063349] text-white font-bold rounded-lg shadow-xs flex items-center gap-1 transition"
+                  className="px-2.5 py-1 bg-[#08415C] hover:bg-[#063349] text-white text-[11px] font-bold rounded-lg shadow-xs flex items-center gap-1 transition"
                 >
-                  <UserCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <UserCheck className="w-3 h-3 text-[#D4AF37]" />
                   <span>Assign {selectedIds.length} Selected ➔</span>
                 </button>
               )}
-
-              <span>
-                Showing <strong>{filteredPeople.length}</strong> of <strong>{people.length}</strong> devotees
-                {activeVolunteerId !== "ALL" && selectedVolunteerObj && (
-                  <span className="font-semibold text-[#08415C]">
-                    {" "}allocated to {selectedVolunteerObj.name}
-                  </span>
-                )}
-              </span>
             </div>
 
-            {/* Quick Status Sub-filters: All | Assigned | Unassigned | To Call | Completed Calls */}
-            <div className="flex items-center gap-1.5 bg-[#FAF8F5] p-1 rounded-xl border border-[#E5D8B8] flex-wrap">
-              <button
-                type="button"
-                onClick={() => setToCallFilter("ALL")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                  toCallFilter === "ALL"
-                    ? "bg-[#08415C] text-white shadow-xs"
-                    : "text-stone-600 hover:bg-white"
-                }`}
+            {/* Sort Dropdown */}
+            <div className="relative flex items-center">
+              <select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value)}
+                className="text-xs font-semibold text-stone-700 bg-white border border-stone-200 rounded-lg pl-2 pr-6 py-1.5 appearance-none cursor-pointer hover:bg-stone-50 outline-none shadow-2xs"
               >
-                All ({people.length})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setToCallFilter("ASSIGNED")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
-                  toCallFilter === "ASSIGNED"
-                    ? "bg-[#00A896] text-white shadow-xs"
-                    : "text-[#007F70] hover:bg-white"
-                }`}
-                title="Contacts assigned to a caller"
-              >
-                <UserCheck className="w-3 h-3" />
-                <span>Assigned</span>
-                <span className="font-mono text-[10px]">({assignedCount})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setToCallFilter("UNASSIGNED")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
-                  toCallFilter === "UNASSIGNED"
-                    ? "bg-amber-600 text-white shadow-xs"
-                    : "text-amber-800 hover:bg-white"
-                }`}
-                title="Contacts waiting to be assigned to a caller"
-              >
-                <UserX className="w-3 h-3" />
-                <span>Unassigned</span>
-                <span className="font-mono text-[10px]">({unassignedCount})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setToCallFilter("PENDING")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
-                  toCallFilter === "PENDING"
-                    ? "bg-[#08415C] text-white shadow-xs"
-                    : "text-stone-600 hover:bg-white"
-                }`}
-                title="Devotees waiting for call"
-              >
-                <span>To Call</span>
-                <span className="font-mono text-[10px]">({pendingCallsCount})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setToCallFilter("COMPLETED")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
-                  toCallFilter === "COMPLETED"
-                    ? "bg-emerald-600 text-white shadow-xs"
-                    : "text-emerald-700 hover:bg-white"
-                }`}
-                title="Devotees where call has been completed"
-              >
-                <span>Completed</span>
-                <span className="font-mono text-[10px]">({completedCallsCount})</span>
-              </button>
+                <option value="name-asc">⇅ Name A-Z</option>
+                <option value="name-desc">⇅ Name Z-A</option>
+                <option value="pending-first">⇅ To Call First</option>
+                <option value="recent">⇅ Recently Added</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2 pointer-events-none" />
             </div>
           </div>
 
-          <div className="space-y-2.5">
+          {/* 3. Devotee Cards List (Compact View matching admin screenshot) */}
+          <div className="space-y-2">
             {loading ? (
               <div className="p-12 text-center text-xs text-stone-500">
                 <div className="inline-block animate-spin text-2xl text-[#D4AF37] mb-2">🪷</div>
@@ -724,7 +862,9 @@ export default function CallingSewaPage() {
               <div className="p-8 text-center text-xs text-stone-500 bg-white rounded-xl border border-stone-200 space-y-2">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
                 <p className="font-semibold text-stone-700">
-                  {toCallFilter === "PENDING"
+                  {searchQuery
+                    ? `No devotees found matching "${searchQuery}".`
+                    : toCallFilter === "PENDING"
                     ? "Wonderful! All assigned devotees have been called."
                     : toCallFilter === "UNASSIGNED"
                     ? "Great! All devotees are currently assigned to callers."
@@ -732,10 +872,13 @@ export default function CallingSewaPage() {
                     ? "No assigned devotees found in this queue."
                     : "No devotees found in this queue."}
                 </p>
-                {toCallFilter !== "ALL" && (
+                {(toCallFilter !== "ALL" || searchQuery) && (
                   <button
                     type="button"
-                    onClick={() => setToCallFilter("ALL")}
+                    onClick={() => {
+                      setToCallFilter("ALL");
+                      setSearchQuery("");
+                    }}
                     className="text-xs text-[#08415C] font-bold hover:underline"
                   >
                     View all devotees ({people.length})
@@ -750,236 +893,264 @@ export default function CallingSewaPage() {
                   ? getOutcomeConfig(latestCall.outcome)
                   : null;
                 const isAssigned = !!person.assignedVolunteerId || !!person.assignedVolunteer;
+                const photoUrl = getPersonPhoto(person);
+                const avatarColor = getAvatarColor(person.fullName);
 
                 return (
                   <div
                     key={person.id}
-                    className={`p-3.5 sm:p-4 rounded-xl border transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs ${
+                    className={`p-3 sm:p-3.5 rounded-2xl border transition flex items-center justify-between gap-2.5 sm:gap-3.5 shadow-2xs hover:shadow-xs relative ${
                       isCompleted && outcomeConfig
-                        ? `${outcomeConfig.cardBg} ring-1 ring-offset-0 ${
-                            latestCall.outcome === "YES_WILL_ATTEND"
-                              ? "ring-emerald-400/60"
-                              : latestCall.outcome === "NO_WILL_NOT_ATTEND"
-                              ? "ring-rose-300/60"
-                              : latestCall.outcome === "CALL_NOT_PICKED"
-                              ? "ring-amber-300/60"
-                              : latestCall.outcome === "NOT_CONFIRMED"
-                              ? "ring-purple-300/60"
-                              : latestCall.outcome === "CONFIRM_LATER"
-                              ? "ring-blue-300/60"
-                              : "ring-emerald-300/50"
-                          }`
+                        ? `${outcomeConfig.cardBg} border-emerald-200/70`
                         : isAssigned
-                        ? "bg-[#F0FDF9] border-[#00A896]/50 border-l-4 border-l-[#00A896] hover:border-[#00A896] shadow-2xs"
-                        : "bg-[#FFFDF5] border-amber-300 border-l-4 border-l-amber-400 hover:border-amber-400 shadow-2xs"
+                        ? "bg-white border-stone-200/90 hover:border-emerald-300"
+                        : "bg-[#FFFDF7] border-amber-200/80 hover:border-amber-300"
                     }`}
                   >
-                    {/* Bulk Selection Checkbox */}
-                    <div
-                      className="flex items-center self-start sm:self-center pr-1 flex-shrink-0 pt-0.5 sm:pt-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    {/* Left: Checkbox + Avatar (Photo or Colored Initials) */}
+                    <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
                       <input
                         type="checkbox"
                         checked={selectedIds.includes(person.id)}
                         onChange={(e) => toggleSelectPerson(person.id, e)}
                         className="w-4 h-4 rounded accent-[#08415C] cursor-pointer"
-                        title="Select for bulk assignment"
+                        title="Select devotee"
                       />
+
+                      {/* Circular Avatar */}
+                      <div
+                        onClick={() => openPersonModal(person.id)}
+                        className="cursor-pointer flex-shrink-0"
+                        title="Click to view devotee profile"
+                      >
+                        {photoUrl ? (
+                          <img
+                            src={photoUrl}
+                            alt={person.fullName}
+                            className="w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white shadow-xs"
+                          />
+                        ) : (
+                          <div
+                            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-sm tracking-wide shadow-2xs select-none ${avatarColor.bg} ${avatarColor.text}`}
+                          >
+                            {getInitials(person.fullName)}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Left: Devotee Info & Completed Response Display */}
-                    <div
-                      className="cursor-pointer flex-1 min-w-0"
-                      onClick={() => openPersonModal(person.id)}
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-serif font-bold text-sm sm:text-base text-[#08415C] hover:underline">
+                    {/* Center Column: Name, Batch/Course Tags, Caller Info */}
+                    <div className="flex-1 min-w-0 pr-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          onClick={() => openPersonModal(person.id)}
+                          className="font-bold text-[13px] sm:text-[15px] text-stone-900 leading-tight hover:text-[#08415C] hover:underline cursor-pointer truncate max-w-full"
+                        >
                           {person.fullName}
                         </span>
+                      </div>
 
-                        {/* Visual Response Badge on Completed Calls */}
-                        {isCompleted && outcomeConfig ? (
-                          <div
-                            className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-bold shadow-2xs ${outcomeConfig.badgeColor}`}
-                          >
-                            <span>{outcomeConfig.icon}</span>
-                            <span>{outcomeConfig.label}</span>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200 flex items-center gap-1">
-                            <Phone className="w-2.5 h-2.5 text-stone-400" />
-                            <span>To Call</span>
-                          </span>
-                        )}
-
-                        {/* Assigned vs Unassigned Visual Badge */}
-                        {isAssigned ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1" title={`Assigned to ${person.assignedVolunteer?.name || "Caller"}`}>
-                            <UserCheck className="w-2.5 h-2.5 text-emerald-700" />
-                            <span>Assigned</span>
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 animate-pulse" title="Devotee not yet assigned to any caller">
-                            <UserX className="w-2.5 h-2.5 text-amber-700" />
-                            <span>Unassigned</span>
-                          </span>
-                        )}
-
-                        <Badge variant="morpankh" size="sm">{person.stage}</Badge>
-                        <span className="text-xs font-mono text-stone-600 font-semibold">
-                          +91 {person.mobile}
-                        </span>
-                        {person.area && (
-                          <span className="text-[11px] text-stone-500">• {person.area}</span>
-                        )}
-
-                        {person.courseEnrollments && person.courseEnrollments.length > 0 && (
+                      {/* Batch Tags / Pills Row */}
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                        {/* Course Enrollment Batch */}
+                        {person.courseEnrollments && person.courseEnrollments.length > 0 ? (
                           person.courseEnrollments.map((enr: any) => (
                             <span
                               key={enr.id}
-                              className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1"
-                              title={`Enrolled in ${enr.course?.title || "Course"} (${enr.batch?.batchName || "Batch"})`}
+                              className="text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#D1FAE5] text-[#065F46] border border-emerald-200/60 flex items-center gap-1 leading-none shadow-2xs"
+                              title={`Course: ${enr.course?.title || "Course"} (${enr.batch?.batchName || "Batch"})`}
                             >
                               <span>🎓</span>
-                              <span>{enr.batch?.batchName || enr.course?.title}</span>
+                              <span className="truncate max-w-[140px] sm:max-w-[200px]">
+                                {enr.batch?.batchName || enr.course?.title}
+                              </span>
                             </span>
                           ))
-                        )}
+                        ) : null}
 
+                        {/* Tags Pill */}
                         {person.tags && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                            🏷️ {person.tags}
+                          <span
+                            className="text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] border border-amber-200/60 flex items-center gap-1 leading-none shadow-2xs"
+                            title={`Tag: ${person.tags}`}
+                          >
+                            <span>🏷️</span>
+                            <span className="truncate max-w-[140px] sm:max-w-[180px]">{person.tags}</span>
                           </span>
                         )}
 
-                        {person.source && person.source !== "Reference" && person.source !== "Excel Import" && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 border border-stone-200">
-                            {person.source}
-                          </span>
-                        )}
+                        {/* Fallback to source if no enrollment or tag */}
+                        {(!person.courseEnrollments || person.courseEnrollments.length === 0) &&
+                          !person.tags &&
+                          person.source &&
+                          person.source !== "Reference" &&
+                          person.source !== "Excel Import" && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200 leading-none">
+                              {person.source}
+                            </span>
+                          )}
                       </div>
 
-                      {/* Caller Assignment, Last Call Time, and Remarks */}
-                      <div className="text-[11px] text-stone-600 mt-1.5 flex items-center gap-3 flex-wrap">
-                        <span className="flex items-center gap-1">
+                      {/* Caller Line */}
+                      <div className="text-[11px] text-stone-500 mt-1 flex items-center gap-1.5 flex-wrap">
+                        <span>
                           Caller:{" "}
                           {person.assignedVolunteer?.name ? (
-                            <strong className="text-[#007F70] bg-[#E6F7F4] px-1.5 py-0.5 rounded border border-[#00A896]/30">
-                              {person.assignedVolunteer.name}
-                            </strong>
+                            <strong className="text-stone-700 font-semibold">{person.assignedVolunteer.name}</strong>
                           ) : (
-                            <strong className="text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 italic">
-                              Unassigned (Needs Caller)
-                            </strong>
+                            <span className="text-amber-700 font-semibold italic">Unassigned</span>
                           )}
                         </span>
 
-                        {isCompleted && latestCall?.createdAt && (
-                          <span className="text-stone-500 font-mono text-[10px]">
-                            • Called {new Date(latestCall.createdAt).toLocaleString("en-IN", {
-                              month: "short",
-                              day: "2-digit",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        )}
-
-                        {person.notes && !latestCall?.notes && (
-                          <span className="italic line-clamp-1 text-stone-500">
-                            &quot;{person.notes}&quot;
+                        {isCompleted && outcomeConfig && (
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full border flex items-center gap-0.5 ${outcomeConfig.badgeColor}`}
+                          >
+                            <span>{outcomeConfig.icon}</span>
+                            <span>{outcomeConfig.label}</span>
                           </span>
                         )}
                       </div>
-
-                      {/* Display Latest Call Remarks / Discussion Notes */}
-                      {isCompleted && latestCall?.notes && (
-                        <div className="mt-1.5 text-xs text-stone-700 bg-white/80 p-2 rounded-lg border border-stone-200/70 italic flex items-start gap-1.5 shadow-2xs">
-                          <span className="font-bold not-italic text-[#08415C] text-[11px] whitespace-nowrap">
-                            Remarks:
-                          </span>
-                          <span className="line-clamp-2">&quot;{latestCall.notes}&quot;</span>
-                        </div>
-                      )}
                     </div>
 
-                    {/* Actions & Reassignment */}
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-                      {hasPermission("calling:assign") && (
-                        reassigningId === person.id ? (
-                          <div className="flex items-center gap-1 bg-stone-50 p-1 rounded-lg border border-stone-200">
-                            <select
-                              value={targetVolunteerId}
-                              onChange={(e) => setTargetVolunteerId(e.target.value)}
-                              className="text-[11px] p-1 border rounded bg-white outline-none"
-                            >
-                              <option value="">Select Volunteer...</option>
-                              {volunteers.map((v) => (
-                                <option key={v.id} value={v.id}>
-                                  {v.name}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              disabled={!targetVolunteerId}
-                              onClick={() => handleReassign(person.id, targetVolunteerId)}
-                              className="px-2 py-1 bg-[#08415C] text-white text-[10px] font-bold rounded"
-                            >
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setReassigningId(null)}
-                              className="px-1.5 py-1 text-stone-500 text-[10px]"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
+                    {/* Right Column: Stage + Menu (Top) | Phone + Location (Mid) | Call + WhatsApp (Bottom) */}
+                    <div className="flex flex-col items-end justify-between self-stretch flex-shrink-0 text-right gap-1">
+                      {/* Top: Stage badge + More options menu */}
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200/60 leading-none shadow-2xs">
+                          {person.stage || "Devotee"}
+                        </span>
+
+                        <div className="relative">
                           <button
                             type="button"
-                            onClick={() => setReassigningId(person.id)}
-                            className="px-2 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 text-[11px] font-semibold rounded-lg transition"
-                            title="Assign to another volunteer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMenuPersonId(menuPersonId === person.id ? null : person.id);
+                            }}
+                            className="p-1 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition"
+                            title="More options"
                           >
-                            Reassign
+                            <MoreVertical className="w-4 h-4" />
                           </button>
-                        )
-                      )}
 
-                      {/* Call Action Button */}
-                      <button
-                        onClick={() => openCallModal(person)}
-                        className={`flex-1 sm:flex-initial px-2.5 py-1.5 text-white text-xs font-semibold rounded-lg shadow-xs flex items-center justify-center gap-1 transition ${
-                          isCompleted
-                            ? "bg-[#08415C] hover:bg-[#0B4F6C] border border-[#D4AF37]/40"
-                            : "bg-[#00A896] hover:bg-[#028090]"
-                        }`}
-                        title={isCompleted ? "Call Again / Update Response" : "Click to Dial Devotee"}
-                      >
-                        <PhoneCall className="w-3.5 h-3.5" />
-                        <span>{isCompleted ? "Update" : "Call"}</span>
-                      </button>
+                          {/* 3-Dots Dropdown Menu */}
+                          {menuPersonId === person.id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 top-6 z-30 w-44 bg-white rounded-xl shadow-lg border border-stone-200 py-1 text-left text-xs text-stone-700"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMenuPersonId(null);
+                                  openPersonModal(person.id);
+                                }}
+                                className="w-full px-3 py-1.5 hover:bg-stone-50 flex items-center gap-2"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-stone-500" />
+                                <span>View Full Profile</span>
+                              </button>
 
-                      <button
-                        onClick={() => openWhatsAppModal(person)}
-                        className="flex-1 sm:flex-initial px-2.5 py-1.5 bg-[#08415C] hover:bg-[#0B4F6C] text-white text-xs font-semibold rounded-lg border border-[#D4AF37]/50 shadow-xs flex items-center justify-center gap-1 transition"
-                        title="Send WhatsApp"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 text-[#D4AF37]" />
-                        <span>WhatsApp</span>
-                      </button>
+                              {hasPermission("calling:assign") && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMenuPersonId(null);
+                                    setReassigningId(person.id);
+                                  }}
+                                  className="w-full px-3 py-1.5 hover:bg-stone-50 flex items-center gap-2 text-stone-700"
+                                >
+                                  <UserCheck className="w-3.5 h-3.5 text-[#00A896]" />
+                                  <span>Reassign Caller</span>
+                                </button>
+                              )}
 
-                      <button
-                        onClick={() => openPersonModal(person.id)}
-                        className="p-1.5 bg-stone-100 hover:bg-stone-200 text-[#08415C] rounded-lg transition"
-                        title="Open 360° Profile"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMenuPersonId(null);
+                                  openCallModal(person);
+                                }}
+                                className="w-full px-3 py-1.5 hover:bg-stone-50 flex items-center gap-2 text-emerald-700 font-medium"
+                              >
+                                <Phone className="w-3.5 h-3.5" />
+                                <span>Log Call Response</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Middle: Phone + Location */}
+                      <div className="flex flex-col items-end">
+                        <span className="text-[11px] sm:text-xs font-mono font-semibold text-stone-700 leading-tight">
+                          +91 {person.mobile}
+                        </span>
+                        <span className="text-[10px] text-stone-500 flex items-center gap-0.5 leading-tight mt-0.5">
+                          <MapPin className="w-2.5 h-2.5 text-stone-400" />
+                          <span>{person.area || "Chandkheda"}</span>
+                        </span>
+                      </div>
+
+                      {/* Bottom: Action Buttons (Mint Call Button + Vibrant WhatsApp Button) */}
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => openCallModal(person)}
+                          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#ECFDF5] hover:bg-[#D1FAE5] active:bg-[#A7F3D0] text-[#059669] flex items-center justify-center transition shadow-2xs border border-emerald-200/60"
+                          title={isCompleted ? "Call Again / Update Response" : "Call Devotee"}
+                        >
+                          <Phone className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openWhatsAppModal(person)}
+                          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] active:bg-[#1EAA50] text-white flex items-center justify-center transition shadow-2xs"
+                          title="Send WhatsApp Message"
+                        >
+                          <MessageSquare className="w-4 h-4 fill-current" />
+                        </button>
+                      </div>
                     </div>
+
+                    {/* Inline Reassign overlay if triggered */}
+                    {reassigningId === person.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute inset-x-2 bottom-2 z-20 bg-stone-50 p-2 rounded-xl border border-stone-300 shadow-md flex items-center gap-2"
+                      >
+                        <span className="text-xs font-bold text-stone-700">Assign To:</span>
+                        <select
+                          value={targetVolunteerId}
+                          onChange={(e) => setTargetVolunteerId(e.target.value)}
+                          className="text-xs p-1.5 border rounded-lg bg-white outline-none flex-1"
+                        >
+                          <option value="">Select Volunteer...</option>
+                          {volunteers.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          disabled={!targetVolunteerId}
+                          onClick={() => handleReassign(person.id, targetVolunteerId)}
+                          className="px-3 py-1.5 bg-[#08415C] text-white text-xs font-bold rounded-lg disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReassigningId(null)}
+                          className="px-2 py-1.5 text-stone-500 hover:text-stone-700 text-xs"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })

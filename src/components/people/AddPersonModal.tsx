@@ -15,6 +15,8 @@ import {
   Plus,
   X,
   Bookmark,
+  Camera,
+  Upload,
 } from "lucide-react";
 import { CRMContext } from "../layout/RootShell";
 
@@ -62,6 +64,7 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
   const [stage, setStage] = useState("New Member");
   const [assignedVolunteerId, setAssignedVolunteerId] = useState("");
   const [notes, setNotes] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string>("");
 
   // Course & Batch enrollment options
   const [coursesList, setCoursesList] = useState<any[]>([]);
@@ -173,6 +176,41 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
     setLabels((prev) => prev.filter((l) => l !== labelToRemove));
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxDim = 360;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.82);
+        setPhotoUrl(compressed);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -208,6 +246,8 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
           assignedVolunteerId: assignedVolunteerId || null,
           notes: combinedNotes,
           tags: uniqueTags,
+          photoUrl: photoUrl || undefined,
+          customData: photoUrl ? { photoUrl } : undefined,
           courseId: selectedCourseId || undefined,
           batchId: selectedBatchId || undefined,
         }),
@@ -294,6 +334,68 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
               <Users className="w-4 h-4" />
               <span>Family</span>
             </button>
+          </div>
+        </div>
+
+        {/* Contact Photo / Camera Capture (Admin Requirement) */}
+        <div className="bg-[#FAF8F5] p-3 sm:p-3.5 rounded-2xl border border-[#E5D8B8] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="relative shrink-0">
+              {photoUrl ? (
+                <img
+                  src={photoUrl}
+                  alt="Contact preview"
+                  className="w-14 h-14 rounded-full object-cover border-2 border-[#D4AF37] shadow-xs"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-stone-100 text-stone-400 flex items-center justify-center border-2 border-dashed border-stone-300">
+                  <Camera className="w-6 h-6 text-stone-400" />
+                </div>
+              )}
+              {photoUrl && (
+                <button
+                  type="button"
+                  onClick={() => setPhotoUrl("")}
+                  className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-xs transition"
+                  title="Remove photo"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-[#08415C]">Contact Photo</h4>
+              <p className="text-[11px] text-stone-500">
+                Click or upload photo so callers can identify contacts easily
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {/* Click Photo with Camera */}
+            <label className="px-3 py-1.5 bg-white border border-[#E5D8B8] hover:border-[#08415C] text-[#08415C] rounded-xl text-xs font-bold shadow-2xs cursor-pointer flex items-center gap-1.5 transition">
+              <Camera className="w-3.5 h-3.5 text-[#00A896]" />
+              <span>Click Photo</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+            </label>
+
+            {/* Upload from Gallery / Files */}
+            <label className="px-3 py-1.5 bg-[#08415C] hover:bg-[#063349] text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer flex items-center gap-1.5 transition">
+              <Upload className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>Upload</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+            </label>
           </div>
         </div>
 
