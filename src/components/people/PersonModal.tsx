@@ -32,6 +32,8 @@ import {
   ChevronUp,
   MoreVertical,
   Check,
+  Camera,
+  Upload,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -74,6 +76,65 @@ export const PersonModal: React.FC<PersonModalProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editFormData, setEditFormData] = useState<any>({});
   const [savingEdit, setSavingEdit] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Photo Upload Handler (Click or Upload for existing contact)
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !personId) return;
+
+    setUploadingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement("canvas");
+        const maxDim = 360;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.82);
+
+        try {
+          const res = await fetch(`/api/people/${personId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ photoUrl: compressed }),
+          });
+          if (res.ok) {
+            setSaveFeedback({ type: "success", message: "Devotee photo updated successfully!" });
+            setTimeout(() => setSaveFeedback(null), 3000);
+            fetchPersonDetails(personId);
+            if (onPersonUpdated) onPersonUpdated();
+          } else {
+            const d = await res.json();
+            alert(d.error || "Failed to update photo");
+          }
+        } catch (err) {
+          console.error(err);
+          alert("Error updating photo");
+        } finally {
+          setUploadingPhoto(false);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Right Side Activity Actions State
   const [activeRightTab, setActiveRightTab] = useState<"log_call" | "add_task" | "add_note">("log_call");
@@ -547,17 +608,42 @@ export const PersonModal: React.FC<PersonModalProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               {/* Devotee Info */}
               <div className="flex items-center gap-3 min-w-0">
-                {getPersonPhoto(person) ? (
-                  <img
-                    src={getPersonPhoto(person)!}
-                    alt={person.fullName}
-                    className="w-12 h-12 rounded-full object-cover border-2 border-[#D4AF37]/50 shadow-xs flex-shrink-0"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-[#08415C] text-[#D4AF37] font-bold text-sm flex items-center justify-center border-2 border-[#D4AF37]/50 shadow-xs flex-shrink-0 select-none">
-                    {person.fullName.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()}
-                  </div>
-                )}
+                {/* Devotee Avatar with Quick Camera/Upload Overlay */}
+                <div className="relative group flex-shrink-0">
+                  {getPersonPhoto(person) ? (
+                    <img
+                      src={getPersonPhoto(person)!}
+                      alt={person.fullName}
+                      className="w-13 h-13 rounded-full object-cover border-2 border-[#D4AF37]/50 shadow-xs"
+                    />
+                  ) : (
+                    <div className="w-13 h-13 rounded-full bg-[#08415C] text-[#D4AF37] font-bold text-sm flex items-center justify-center border-2 border-[#D4AF37]/50 shadow-xs select-none">
+                      {person.fullName.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()}
+                    </div>
+                  )}
+
+                  {/* Camera Upload Button Overlay */}
+                  <label
+                    htmlFor="person-modal-photo-upload"
+                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#08415C] hover:bg-[#0B4F6C] text-white border-2 border-white flex items-center justify-center cursor-pointer shadow-xs transition"
+                    title={uploadingPhoto ? "Uploading..." : "Click to Take or Upload Photo"}
+                  >
+                    {uploadingPhoto ? (
+                      <span className="animate-spin text-[9px]">⌛</span>
+                    ) : (
+                      <Camera className="w-3 h-3 text-[#D4AF37]" />
+                    )}
+                    <input
+                      id="person-modal-photo-upload"
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handlePhotoUpload}
+                      disabled={uploadingPhoto}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <h4 className="text-base sm:text-lg font-serif font-bold text-[#08415C] truncate">
@@ -636,19 +722,33 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                         <Phone className="w-3.5 h-3.5 text-stone-500" />
                         <span>Copy Mobile</span>
                       </button>
-                      {hasPermission("devotees:delete") && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsMoreMenuOpen(false);
-                            handleDeletePerson();
-                          }}
-                          className="w-full px-3 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 font-medium border-t border-stone-100"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Delete Devotee</span>
-                        </button>
-                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const input = document.getElementById("person-modal-photo-upload") as HTMLInputElement;
+                          if (input) input.click();
+                          setIsMoreMenuOpen(false);
+                        }}
+                        className="w-full px-3 py-2 hover:bg-stone-50 flex items-center gap-2"
+                      >
+                        <Camera className="w-3.5 h-3.5 text-[#08415C]" />
+                        <span>Click / Update Photo</span>
+                      </button>
+
+                      <div className="border-t border-stone-100 my-1" />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMoreMenuOpen(false);
+                          handleDeletePerson();
+                        }}
+                        className="w-full px-3 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 font-medium"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Contact</span>
+                      </button>
                     </div>
                   )}
                 </div>

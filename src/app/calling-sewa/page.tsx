@@ -306,6 +306,42 @@ export default function CallingSewaPage() {
     }
   };
 
+  const handleUnassignPerson = async (personId: string, personName: string) => {
+    if (!confirm(`Unassign ${personName} from calling queue? This contact will be moved to the Unassigned pool.`)) {
+      return;
+    }
+    try {
+      await fetch(`/api/people/${personId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedVolunteerId: null }),
+      });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkInactive = async (personId: string, personName: string, currentlyActive: boolean) => {
+    const actionLabel = currentlyActive ? "inactive / on hold" : "active";
+    if (!confirm(`Mark ${personName} as ${actionLabel}?`)) {
+      return;
+    }
+    try {
+      await fetch(`/api/people/${personId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          active: !currentlyActive,
+          stage: currentlyActive ? "On Hold / Inactive" : "Contacted",
+        }),
+      });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleMarkFollowupComplete = async (taskId: string) => {
     try {
       await fetch("/api/notifications", {
@@ -1198,6 +1234,36 @@ export default function CallingSewaPage() {
                                 <Phone className="w-3.5 h-3.5" />
                                 <span>Log Call Response</span>
                               </button>
+
+                              <div className="border-t border-stone-100 my-1" />
+
+                              {/* Unassign contact from current volunteer so others can take or keep unassigned */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMenuPersonId(null);
+                                  handleUnassignPerson(person.id, person.fullName);
+                                }}
+                                className="w-full px-3 py-1.5 hover:bg-amber-50 flex items-center gap-2 text-amber-800 font-medium"
+                                title="Remove from my calling queue and move to Unassigned pool"
+                              >
+                                <UserX className="w-3.5 h-3.5" />
+                                <span>Move to Unassigned</span>
+                              </button>
+
+                              {/* Mark Inactive / On Hold */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMenuPersonId(null);
+                                  handleMarkInactive(person.id, person.fullName, person.active !== false);
+                                }}
+                                className="w-full px-3 py-1.5 hover:bg-stone-100 flex items-center gap-2 text-stone-600 font-medium"
+                                title="Mark as On Hold / Inactive so it doesn't appear in daily calling"
+                              >
+                                <Clock className="w-3.5 h-3.5" />
+                                <span>{person.active === false ? "Mark as Active" : "Put On Hold / Inactive"}</span>
+                              </button>
                             </div>
                           )}
                         </div>
@@ -1476,18 +1542,38 @@ export default function CallingSewaPage() {
           <div className="text-xs">
             <span className="font-bold text-[#D4AF37] text-sm">{selectedIds.length}</span> devotees selected
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => setSelectedIds([])}
-              className="px-2.5 py-1 text-xs text-stone-300 hover:text-white transition"
+              className="px-2 py-1 text-xs text-stone-300 hover:text-white transition"
             >
               Deselect
             </button>
             <button
               type="button"
+              onClick={async () => {
+                if (!confirm(`Move ${selectedIds.length} selected devotees to Unassigned pool?`)) return;
+                for (const pid of selectedIds) {
+                  await fetch(`/api/people/${pid}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ assignedVolunteerId: null }),
+                  });
+                }
+                setSelectedIds([]);
+                fetchData();
+              }}
+              className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1 transition"
+              title="Unassign selected devotees so they move to the pool"
+            >
+              <UserX className="w-3.5 h-3.5" />
+              <span>Unassign ({selectedIds.length})</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setIsAssignMultipleOpen(true)}
-              className="px-3.5 py-1.5 bg-[#D4AF37] hover:bg-[#c49f27] text-[#08415C] font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition"
+              className="px-3 py-1.5 bg-[#D4AF37] hover:bg-[#c49f27] text-[#08415C] font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition"
             >
               <UserCheck className="w-3.5 h-3.5" />
               <span>Assign Calls</span>

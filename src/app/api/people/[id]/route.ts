@@ -88,6 +88,9 @@ export async function PATCH(
       address,
       japaDailyRounds,
       spiritualMentor,
+      photoUrl,
+      customData,
+      active,
     } = body;
 
     const updateData: any = {};
@@ -107,6 +110,28 @@ export async function PATCH(
     if (address !== undefined) updateData.address = address;
     if (japaDailyRounds !== undefined) updateData.japaDailyRounds = parseInt(japaDailyRounds) || 0;
     if (spiritualMentor !== undefined) updateData.spiritualMentor = spiritualMentor;
+    if (active !== undefined) updateData.active = Boolean(active);
+    if (photoUrl !== undefined || customData !== undefined) {
+      const existing = await prisma.person.findUnique({
+        where: { id: params.id },
+        select: { customData: true },
+      });
+      let parsedCustom: any = {};
+      if (existing?.customData) {
+        try {
+          parsedCustom = typeof existing.customData === "string" ? JSON.parse(existing.customData) : existing.customData;
+        } catch {
+          parsedCustom = {};
+        }
+      }
+      if (customData) {
+        parsedCustom = { ...parsedCustom, ...(typeof customData === "string" ? JSON.parse(customData) : customData) };
+      }
+      if (photoUrl) {
+        parsedCustom.photoUrl = photoUrl;
+      }
+      updateData.customData = JSON.stringify(parsedCustom);
+    }
 
     const updated = await prisma.person.update({
       where: { id: params.id },
