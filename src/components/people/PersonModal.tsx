@@ -28,6 +28,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Users,
+  ChevronDown,
+  ChevronUp,
+  MoreVertical,
+  Check,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -57,6 +61,15 @@ export const PersonModal: React.FC<PersonModalProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [fallbackQueue, setFallbackQueue] = useState<string[]>([]);
 
+  // Priority Accordions State
+  const [isFollowupTaskOpen, setIsFollowupTaskOpen] = useState(true);
+  const [isBasicInfoOpen, setIsBasicInfoOpen] = useState(false);
+  const [isCoursesOpen, setIsCoursesOpen] = useState(false);
+  const [isCallingHistoryOpen, setIsCallingHistoryOpen] = useState(false);
+  const [isActivityStreamOpen, setIsActivityStreamOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
   // Edit Mode state
   const [isEditing, setIsEditing] = useState(false);
   const [editFormData, setEditFormData] = useState<any>({});
@@ -64,7 +77,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
 
   // Right Side Activity Actions State
   const [activeRightTab, setActiveRightTab] = useState<"log_call" | "add_task" | "add_note">("log_call");
-  const [callOutcome, setCallOutcome] = useState("CONNECTED");
+  const [callOutcome, setCallOutcome] = useState("YES_WILL_ATTEND");
   const [callNotes, setCallNotes] = useState("");
   const [callNextDate, setCallNextDate] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
@@ -290,14 +303,14 @@ export const PersonModal: React.FC<PersonModalProps> = ({
     }
   };
 
-  // Quick Log Call Action (Right Side Odoo-style)
+  // Quick Log Call Action (Priority 2 Workflow)
   const handleLogCall = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!personId || !callNotes.trim()) return;
 
     setActionSubmitting(true);
     try {
-      await fetch("/api/calls", {
+      const res = await fetch("/api/calls", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -310,12 +323,22 @@ export const PersonModal: React.FC<PersonModalProps> = ({
         }),
       });
 
-      setCallNotes("");
-      setCallNextDate("");
-      fetchPersonDetails(personId);
-      if (onPersonUpdated) onPersonUpdated();
+      if (res.ok) {
+        setCallNotes("");
+        setCallNextDate("");
+        setSaveFeedback({ type: "success", message: "Call activity saved successfully!" });
+        setTimeout(() => setSaveFeedback(null), 3500);
+        fetchPersonDetails(personId);
+        if (onPersonUpdated) onPersonUpdated();
+      } else {
+        const d = await res.json();
+        setSaveFeedback({ type: "error", message: d.error || "Failed to save call activity." });
+        setTimeout(() => setSaveFeedback(null), 4000);
+      }
     } catch (err) {
       console.error(err);
+      setSaveFeedback({ type: "error", message: "Failed to record call activity. Notes are preserved." });
+      setTimeout(() => setSaveFeedback(null), 4000);
     } finally {
       setActionSubmitting(false);
     }
@@ -328,7 +351,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
 
     setActionSubmitting(true);
     try {
-      await fetch("/api/followups", {
+      const res = await fetch("/api/followups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -339,12 +362,22 @@ export const PersonModal: React.FC<PersonModalProps> = ({
         }),
       });
 
-      setTaskRemarks("");
-      setTaskDueDate("");
-      fetchPersonDetails(personId);
-      if (onPersonUpdated) onPersonUpdated();
+      if (res.ok) {
+        setTaskRemarks("");
+        setTaskDueDate("");
+        setSaveFeedback({ type: "success", message: "Follow-up task created successfully!" });
+        setTimeout(() => setSaveFeedback(null), 3500);
+        fetchPersonDetails(personId);
+        if (onPersonUpdated) onPersonUpdated();
+      } else {
+        const d = await res.json();
+        setSaveFeedback({ type: "error", message: d.error || "Failed to create follow-up task." });
+        setTimeout(() => setSaveFeedback(null), 4000);
+      }
     } catch (err) {
       console.error(err);
+      setSaveFeedback({ type: "error", message: "Failed to create task." });
+      setTimeout(() => setSaveFeedback(null), 4000);
     } finally {
       setActionSubmitting(false);
     }
@@ -357,7 +390,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
 
     setActionSubmitting(true);
     try {
-      await fetch(`/api/people/${personId}`, {
+      const res = await fetch(`/api/people/${personId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -365,13 +398,41 @@ export const PersonModal: React.FC<PersonModalProps> = ({
         }),
       });
 
-      setNewNote("");
-      fetchPersonDetails(personId);
-      if (onPersonUpdated) onPersonUpdated();
+      if (res.ok) {
+        setNewNote("");
+        setSaveFeedback({ type: "success", message: "Note appended to devotee dossier!" });
+        setTimeout(() => setSaveFeedback(null), 3500);
+        fetchPersonDetails(personId);
+        if (onPersonUpdated) onPersonUpdated();
+      } else {
+        const d = await res.json();
+        setSaveFeedback({ type: "error", message: d.error || "Failed to add note." });
+        setTimeout(() => setSaveFeedback(null), 4000);
+      }
     } catch (err) {
       console.error(err);
+      setSaveFeedback({ type: "error", message: "Failed to add note." });
+      setTimeout(() => setSaveFeedback(null), 4000);
     } finally {
       setActionSubmitting(false);
+    }
+  };
+
+  const handleCompleteTask = async (taskId: string) => {
+    try {
+      const res = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: taskId }),
+      });
+      if (res.ok) {
+        setSaveFeedback({ type: "success", message: "Follow-up marked as completed!" });
+        setTimeout(() => setSaveFeedback(null), 3000);
+        fetchPersonDetails(personId!);
+        if (onPersonUpdated) onPersonUpdated();
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -387,7 +448,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
       onClose={onClose}
       title={person ? person.fullName : "Member Profile"}
       subtitle={person ? `360° Devotee Journey Dossier • ${person.area || "Chandkheda"}` : "Loading 360° Profile..."}
-      maxWidth="5xl"
+      maxWidth="4xl"
       headerAction={
         queue.length > 1 ? (
           <div className="flex items-center gap-1 bg-white border border-[#E5D8B8] rounded-xl p-1 shadow-2xs mr-1">
@@ -426,26 +487,45 @@ export const PersonModal: React.FC<PersonModalProps> = ({
           <p className="text-xs font-semibold">Loading 360° Member Journey Dossier...</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-3.5">
+          {/* Instant Activity Save Feedback Banner */}
+          {saveFeedback && (
+            <div
+              className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-200 shadow-2xs ${
+                saveFeedback.type === "success"
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                  : "bg-rose-50 text-rose-800 border-rose-300"
+              }`}
+            >
+              {saveFeedback.type === "success" ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+              )}
+              <span>{saveFeedback.message}</span>
+            </div>
+          )}
+
           {/* Quick Contact Switcher Banner for Callers */}
           {queue.length > 1 && (
-            <div className="bg-gradient-to-r from-[#FAF8F5] via-[#FFFDF7] to-[#FAF8F5] border border-[#E5D8B8] rounded-2xl p-2.5 px-3 sm:px-4 flex items-center justify-between shadow-2xs">
+            <div className="bg-gradient-to-r from-[#FAF8F5] via-[#FFFDF7] to-[#FAF8F5] border border-[#E5D8B8] rounded-2xl p-2 px-3 sm:px-4 flex items-center justify-between shadow-2xs">
               <button
                 type="button"
                 disabled={!hasPrevious}
                 onClick={handlePrevious}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 hover:text-[#08415C] disabled:opacity-35 disabled:cursor-not-allowed font-semibold text-xs transition shadow-2xs"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 hover:text-[#08415C] disabled:opacity-35 disabled:cursor-not-allowed font-semibold text-xs transition shadow-2xs"
               >
                 <ChevronLeft className="w-4 h-4 text-[#08415C]" />
-                <span>Previous Contact</span>
+                <span className="hidden sm:inline">Previous Contact</span>
+                <span className="sm:hidden">Prev</span>
               </button>
 
               <div className="flex items-center gap-2 text-stone-700 font-medium text-xs">
-                <span className="bg-[#E5D8B8]/30 px-2.5 py-1 rounded-full font-bold text-[#08415C] text-xs">
+                <span className="bg-[#E5D8B8]/30 px-2.5 py-0.5 rounded-full font-bold text-[#08415C] text-xs">
                   Contact {currentIndex >= 0 ? currentIndex + 1 : 1} of {queue.length}
                 </span>
-                <span className="text-[11px] text-stone-400 hidden md:inline">
-                  (Keyboard: ← Previous | Next →)
+                <span className="text-[10px] text-stone-400 hidden md:inline">
+                  (Keyboard: ← Prev | Next →)
                 </span>
               </div>
 
@@ -453,107 +533,140 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                 type="button"
                 disabled={!hasNext}
                 onClick={handleNext}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#08415C] hover:bg-[#0B4F6C] text-white disabled:opacity-35 disabled:cursor-not-allowed font-semibold text-xs transition shadow-2xs"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#08415C] hover:bg-[#0B4F6C] text-white disabled:opacity-35 disabled:cursor-not-allowed font-semibold text-xs transition shadow-2xs"
               >
-                <span>Next Contact</span>
+                <span className="hidden sm:inline">Next Contact</span>
+                <span className="sm:hidden">Next</span>
                 <ChevronRight className="w-4 h-4 text-[#D4AF37]" />
               </button>
             </div>
           )}
 
-          {/* Top Header Card with Actions */}
-          <div className="p-3.5 sm:p-4 bg-[#FAF8F5] border border-[#E5D8B8] rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-3">
-              {getPersonPhoto(person) ? (
-                <img
-                  src={getPersonPhoto(person)!}
-                  alt={person.fullName}
-                  className="w-12 h-12 rounded-2xl object-cover border-2 border-[#D4AF37]/50 shadow-xs flex-shrink-0"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-2xl bg-[#08415C] text-[#D4AF37] font-serif text-lg font-bold flex items-center justify-center border-2 border-[#D4AF37]/50 shadow-xs flex-shrink-0">
-                  {person.fullName.split(" ").map((n: string) => n[0]).join("")}
-                </div>
-              )}
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="text-lg font-serif font-bold text-[#08415C]">
-                    {person.fullName}
-                  </h4>
-                  <Badge variant="morpankh" size="sm">{person.stage}</Badge>
-                  {person.japaDailyRounds > 0 && (
-                    <Badge variant="gold" size="sm">📿 {person.japaDailyRounds} Rounds Daily</Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 text-xs text-[#37474F] mt-0.5 flex-wrap">
-                  <span className="flex items-center gap-1 font-mono font-medium">
-                    <Phone className="w-3.5 h-3.5 text-[#00A896]" /> +91 {person.mobile}
-                  </span>
-                  {person.area && (
-                    <span className="flex items-center gap-1 text-stone-500">
-                      <MapPin className="w-3.5 h-3.5 text-[#D4AF37]" /> {person.area}
+          {/* PRIORITY 1 – ALWAYS VISIBLE: Devotee Profile Header & Primary Actions */}
+          <div className="p-3 sm:p-3.5 bg-white border border-[#E5D8B8] rounded-2xl shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Devotee Info */}
+              <div className="flex items-center gap-3 min-w-0">
+                {getPersonPhoto(person) ? (
+                  <img
+                    src={getPersonPhoto(person)!}
+                    alt={person.fullName}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-[#D4AF37]/50 shadow-xs flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-[#08415C] text-[#D4AF37] font-bold text-sm flex items-center justify-center border-2 border-[#D4AF37]/50 shadow-xs flex-shrink-0 select-none">
+                    {person.fullName.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h4 className="text-base sm:text-lg font-serif font-bold text-[#08415C] truncate">
+                      {person.fullName}
+                    </h4>
+                    <Badge variant="morpankh" size="sm">{person.stage || "New Member"}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-stone-600 mt-0.5 flex-wrap">
+                    <span className="font-mono font-medium text-stone-700">+91 {person.mobile}</span>
+                    <span className="text-stone-300">•</span>
+                    <span className="text-stone-500 flex items-center gap-0.5 truncate">
+                      <MapPin className="w-3 h-3 text-[#D4AF37]" /> {person.area || "Chandkheda"}
                     </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons: Call & WhatsApp (Primary) + Edit + More Options */}
+              <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end flex-wrap flex-shrink-0 pt-1 sm:pt-0">
+                <button
+                  type="button"
+                  onClick={() => onOpenCallModal(person)}
+                  className="flex-1 sm:flex-initial px-4 py-2 bg-[#00A896] hover:bg-[#028090] active:bg-[#007F70] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition shadow-xs min-h-[42px]"
+                  title="Dial Call"
+                >
+                  <Phone className="w-4 h-4 fill-current" />
+                  <span>Call</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onOpenWhatsAppModal(person)}
+                  className="flex-1 sm:flex-initial px-4 py-2 bg-[#08415C] hover:bg-[#0B4F6C] active:bg-[#063349] text-white text-xs font-bold rounded-xl border border-[#D4AF37]/50 flex items-center justify-center gap-1.5 transition shadow-xs min-h-[42px]"
+                  title="Open WhatsApp"
+                >
+                  <MessageSquare className="w-4 h-4 text-[#D4AF37]" />
+                  <span>WhatsApp</span>
+                </button>
+
+                {hasPermission("devotees:edit") && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(!isEditing)}
+                    className={`px-3 py-2 text-xs font-semibold rounded-xl border transition flex items-center justify-center gap-1 min-h-[42px] ${
+                      isEditing ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-white text-stone-700 border-stone-200 hover:bg-stone-50"
+                    }`}
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-[#08415C]" />
+                    <span className="hidden sm:inline">{isEditing ? "Cancel" : "Edit"}</span>
+                  </button>
+                )}
+
+                {/* More Options Dropdown */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                    className="p-2 border border-stone-200 hover:bg-stone-50 text-stone-600 rounded-xl transition min-h-[42px] min-w-[42px] flex items-center justify-center"
+                    title="More Options"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+
+                  {isMoreMenuOpen && (
+                    <div className="absolute right-0 top-12 z-30 w-44 bg-white rounded-xl shadow-lg border border-stone-200 py-1 text-left text-xs text-stone-700">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(person.mobile);
+                          setIsMoreMenuOpen(false);
+                          setSaveFeedback({ type: "success", message: "Mobile number copied to clipboard!" });
+                          setTimeout(() => setSaveFeedback(null), 2500);
+                        }}
+                        className="w-full px-3 py-2 hover:bg-stone-50 flex items-center gap-2"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-stone-500" />
+                        <span>Copy Mobile</span>
+                      </button>
+                      {hasPermission("devotees:delete") && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMoreMenuOpen(false);
+                            handleDeletePerson();
+                          }}
+                          className="w-full px-3 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 font-medium border-t border-stone-100"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete Devotee</span>
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
             </div>
-
-            {/* Quick Action Floating Bar */}
-            <div className="flex items-center gap-1.5 w-full md:w-auto justify-end flex-wrap">
-              <button
-                type="button"
-                onClick={() => onOpenCallModal(person)}
-                className="px-3 py-1.5 bg-[#00A896] hover:bg-[#028090] text-white text-xs font-semibold rounded-xl flex items-center gap-1 transition shadow-xs"
-              >
-                <Phone className="w-3.5 h-3.5" /> Call
-              </button>
-              <button
-                type="button"
-                onClick={() => onOpenWhatsAppModal(person)}
-                className="px-3 py-1.5 bg-[#08415C] hover:bg-[#0B4F6C] text-white text-xs font-semibold rounded-xl border border-[#D4AF37]/50 flex items-center gap-1 transition shadow-xs"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-[#D4AF37]" /> WhatsApp
-              </button>
-
-              {/* Edit Button (RBAC) */}
-              {hasPermission("devotees:edit") && (
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(!isEditing)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition flex items-center gap-1 ${
-                    isEditing ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-white text-stone-700 border-stone-200 hover:bg-stone-50"
-                  }`}
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-[#08415C]" />
-                  <span>{isEditing ? "Cancel Edit" : "Edit"}</span>
-                </button>
-              )}
-
-              {/* Delete Button (RBAC) */}
-              {hasPermission("devotees:delete") && (
-                <button
-                  type="button"
-                  onClick={handleDeletePerson}
-                  className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-xl border border-rose-200 transition"
-                  title="Delete Member"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                </button>
-              )}
-            </div>
           </div>
 
-          {/* Edit Mode Inline Form */}
+          {/* Edit Mode Inline Form (if user tapped Edit) */}
           {isEditing && (
-            <form onSubmit={handleSaveEdit} className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-3">
+            <form onSubmit={handleSaveEdit} className="p-3.5 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-3">
               <div className="flex items-center justify-between pb-1 border-b border-amber-200">
                 <span className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Edit3 className="w-4 h-4 text-amber-700" /> Edit Member Information
+                  <Edit3 className="w-4 h-4 text-amber-700" /> Edit Devotee Information
                 </span>
                 <span className="text-[11px] text-amber-700">Save changes to update CRM master record</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">Full Name</label>
                   <input
@@ -593,7 +706,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">Area / Locality</label>
                   <input
@@ -625,7 +738,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
@@ -636,7 +749,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                 <button
                   type="submit"
                   disabled={savingEdit}
-                  className="px-4 py-1.5 bg-[#08415C] text-white rounded-lg text-xs font-bold hover:bg-[#063349] flex items-center gap-1"
+                  className="px-4 py-1.5 bg-[#08415C] text-white rounded-lg text-xs font-bold hover:bg-[#063349] flex items-center gap-1 shadow-xs"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>{savingEdit ? "Saving..." : "Save Changes"}</span>
@@ -645,77 +758,358 @@ export const PersonModal: React.FC<PersonModalProps> = ({
             </form>
           )}
 
-          {/* 360° Two-Column Split Architecture */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            {/* LEFT SIDE (7 Cols) – MEMBER INFORMATION & COURSES */}
-            <div className="lg:col-span-7 space-y-4">
-              {/* Basic Details Grid */}
-              <div className="p-4 bg-white border border-[#E5D8B8] rounded-2xl space-y-3 shadow-xs">
-                <h5 className="text-xs font-bold uppercase tracking-wider text-[#08415C] border-b border-stone-100 pb-2">
-                  Member Profile Dossier
-                </h5>
+          {/* PRIORITY 2 – QUICK CALL LOGGING (Most Important Workflow, Expanded at Top) */}
+          <div className="p-3.5 sm:p-4 bg-white border border-[#E5D8B8] rounded-2xl shadow-xs space-y-3">
+            {/* Horizontal Tabs: Log Call | Follow-up | Note */}
+            <div className="flex border-b border-stone-200 pb-2 gap-1.5 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setActiveRightTab("log_call")}
+                className={`flex-1 py-2 px-3 rounded-xl text-center transition flex items-center justify-center gap-1.5 ${
+                  activeRightTab === "log_call"
+                    ? "bg-[#08415C] text-white shadow-xs"
+                    : "text-stone-600 hover:bg-stone-50 border border-stone-200"
+                }`}
+              >
+                <PhoneCall className="w-3.5 h-3.5" />
+                <span>Log Call</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveRightTab("add_task")}
+                className={`flex-1 py-2 px-3 rounded-xl text-center transition flex items-center justify-center gap-1.5 ${
+                  activeRightTab === "add_task"
+                    ? "bg-[#08415C] text-white shadow-xs"
+                    : "text-stone-600 hover:bg-stone-50 border border-stone-200"
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Follow-up</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveRightTab("add_note")}
+                className={`flex-1 py-2 px-3 rounded-xl text-center transition flex items-center justify-center gap-1.5 ${
+                  activeRightTab === "add_note"
+                    ? "bg-[#08415C] text-white shadow-xs"
+                    : "text-stone-600 hover:bg-stone-50 border border-stone-200"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Note</span>
+              </button>
+            </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            {/* TAB 1: Log Call Form */}
+            {activeRightTab === "log_call" && (
+              <form onSubmit={handleLogCall} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
+                    Call Disposition / Outcome
+                  </label>
+                  <select
+                    value={callOutcome}
+                    onChange={(e) => setCallOutcome(e.target.value)}
+                    className="w-full p-2.5 border border-stone-300 rounded-xl bg-white font-semibold text-xs text-stone-800 outline-none focus:ring-2 focus:ring-[#08415C]/20"
+                  >
+                    <option value="YES_WILL_ATTEND">✓ Yes, Will Attend</option>
+                    <option value="INTERESTED">🌟 Interested</option>
+                    <option value="CONFIRM_LATER">⏰ Confirm Later</option>
+                    <option value="NOT_CONFIRMED">❓ Not Confirmed</option>
+                    <option value="CALL_NOT_PICKED">📞 Call Not Picked</option>
+                    <option value="NOT_REACHABLE">🚫 Not Reachable / Switched Off</option>
+                    <option value="NO_WILL_NOT_ATTEND">✗ No, Will Not Attend</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
+                    What was discussed? *
+                  </label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={callNotes}
+                    onChange={(e) => setCallNotes(e.target.value)}
+                    placeholder="Details of the discussion, devotee response..."
+                    className="w-full p-2.5 border border-stone-300 rounded-xl outline-none text-xs focus:ring-2 focus:ring-[#08415C]/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
+                    Schedule Next Follow-up (Optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={callNextDate}
+                    onChange={(e) => setCallNextDate(e.target.value)}
+                    className="w-full p-2 border border-stone-300 rounded-xl bg-white text-xs outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={actionSubmitting}
+                  className="w-full py-2.5 bg-[#00A896] hover:bg-[#028090] text-white font-bold rounded-xl shadow-xs transition text-xs sm:text-sm flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{actionSubmitting ? "Recording..." : "Save Call Activity"}</span>
+                </button>
+              </form>
+            )}
+
+            {/* TAB 2: Follow-up Form */}
+            {activeRightTab === "add_task" && (
+              <form onSubmit={handleAddTask} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
+                    Task Type
+                  </label>
+                  <select
+                    value={taskType}
+                    onChange={(e) => setTaskType(e.target.value)}
+                    className="w-full p-2.5 border border-stone-300 rounded-xl bg-white font-semibold text-xs text-stone-800 outline-none"
+                  >
+                    <option value="Calling">Follow-up Call</option>
+                    <option value="WhatsApp">WhatsApp Reminder</option>
+                    <option value="Course Follow-up">Course Absentee Follow-up</option>
+                    <option value="Relationship Call">Counseling Session</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
+                    Due Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={taskDueDate}
+                    onChange={(e) => setTaskDueDate(e.target.value)}
+                    className="w-full p-2 border border-stone-300 rounded-xl bg-white text-xs outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
+                    Task Remarks
+                  </label>
+                  <input
+                    type="text"
+                    value={taskRemarks}
+                    onChange={(e) => setTaskRemarks(e.target.value)}
+                    placeholder="e.g. Inquire about BG Chapter 2 notes..."
+                    className="w-full p-2.5 border border-stone-300 rounded-xl text-xs outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={actionSubmitting}
+                  className="w-full py-2.5 bg-[#08415C] hover:bg-[#063349] text-white font-bold rounded-xl shadow-xs transition text-xs sm:text-sm flex items-center justify-center gap-1.5"
+                >
+                  <Calendar className="w-4 h-4 text-[#D4AF37]" />
+                  <span>{actionSubmitting ? "Saving..." : "Create Follow-up Task"}</span>
+                </button>
+              </form>
+            )}
+
+            {/* TAB 3: Add Note Form */}
+            {activeRightTab === "add_note" && (
+              <form onSubmit={handleAddNote} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
+                    Append Note to Dossier
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="Add important notes or personal devotee context..."
+                    className="w-full p-2.5 border border-stone-300 rounded-xl outline-none text-xs"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={actionSubmitting}
+                  className="w-full py-2.5 bg-[#08415C] hover:bg-[#063349] text-white font-bold rounded-xl shadow-xs transition text-xs sm:text-sm flex items-center justify-center gap-1.5"
+                >
+                  <FileText className="w-4 h-4 text-[#D4AF37]" />
+                  <span>{actionSubmitting ? "Adding..." : "Add Note to Dossier"}</span>
+                </button>
+              </form>
+            )}
+          </div>
+
+          {/* PRIORITY 3 – NEXT FOLLOW-UP TASK (Compact Summary Accordion) */}
+          <div className="bg-white border border-[#E5D8B8] rounded-2xl shadow-xs overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setIsFollowupTaskOpen(!isFollowupTaskOpen)}
+              className="w-full p-3 px-3.5 bg-[#FFFDF8] hover:bg-stone-50 flex items-center justify-between text-left transition"
+            >
+              <span className="text-xs font-bold text-[#08415C] flex items-center gap-2">
+                <CalendarClock className="w-4 h-4 text-[#D4AF37]" />
+                <span>Next Follow-up Task</span>
+              </span>
+              <div className="flex items-center gap-1.5 text-stone-400">
+                {nextFollowup && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                    Pending
+                  </span>
+                )}
+                {isFollowupTaskOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </div>
+            </button>
+
+            {isFollowupTaskOpen && (
+              <div className="p-3.5 border-t border-stone-100 text-xs">
+                {nextFollowup ? (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 bg-amber-50/60 p-3 rounded-xl border border-amber-200">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-stone-900 text-sm">{nextFollowup.type}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                          Due: {new Date(nextFollowup.dueDate).toLocaleDateString("en-IN")}
+                        </span>
+                      </div>
+                      <p className="text-stone-600 mt-1 text-xs">{nextFollowup.remarks || "Follow-up discussion scheduled"}</p>
+                      <span className="text-[10px] text-stone-500 mt-0.5 block">
+                        Assigned Caller: <strong>{person.assignedVolunteer?.name || "Caller"}</strong>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCompleteTask(nextFollowup.id)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-xs transition flex items-center gap-1 self-end sm:self-center"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Mark Complete</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between text-xs text-stone-500 py-1">
+                    <span>No Follow-up Scheduled.</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveRightTab("add_task")}
+                      className="text-xs font-bold text-[#08415C] hover:underline"
+                    >
+                      + Schedule Follow-up
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* PRIORITY 4 – BASIC INFORMATION (Collapsed Accordion by default) */}
+          <div className="bg-white border border-[#E5D8B8] rounded-2xl shadow-xs overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setIsBasicInfoOpen(!isBasicInfoOpen)}
+              className="w-full p-3 px-3.5 bg-[#FFFDF8] hover:bg-stone-50 flex items-center justify-between text-left transition"
+            >
+              <span className="text-xs font-bold text-[#08415C] flex items-center gap-2">
+                <User className="w-4 h-4 text-[#08415C]" />
+                <span>Basic Information</span>
+              </span>
+              <div className="flex items-center gap-1.5 text-stone-400">
+                {isBasicInfoOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </div>
+            </button>
+
+            {isBasicInfoOpen && (
+              <div className="p-3.5 border-t border-stone-100 text-xs space-y-3">
+                <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-[10px] text-stone-400 block uppercase">Profession</span>
+                    <span className="text-[10px] text-stone-400 block uppercase font-bold">Profession</span>
                     <span className="font-semibold text-stone-800">{person.profession || "Not specified"}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-stone-400 block uppercase">Age / Group</span>
+                    <span className="text-[10px] text-stone-400 block uppercase font-bold">Age / Group</span>
                     <span className="font-semibold text-stone-800">{person.ageGroup || "N/A"}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-stone-400 block uppercase">Source / Campaign</span>
+                    <span className="text-[10px] text-stone-400 block uppercase font-bold">Source / Campaign</span>
                     <span className="font-semibold text-stone-800">{person.source || "Direct"}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-stone-400 block uppercase">Calling Person</span>
+                    <span className="text-[10px] text-stone-400 block uppercase font-bold">Calling Person</span>
                     <span className="font-semibold text-[#08415C]">{person.assignedVolunteer?.name || "Unassigned"}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-stone-400 block uppercase">Relationship Steward</span>
+                    <span className="text-[10px] text-stone-400 block uppercase font-bold">Relationship Steward</span>
                     <span className="font-semibold text-[#B8860B]">{person.relationshipVolunteer?.name || "Unassigned"}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-stone-400 block uppercase">Registered Since</span>
+                    <span className="text-[10px] text-stone-400 block uppercase font-bold">Registered Since</span>
                     <span className="font-semibold text-stone-800">{new Date(person.createdAt).toLocaleDateString("en-IN")}</span>
                   </div>
+                  {person.spiritualMentor && (
+                    <div>
+                      <span className="text-[10px] text-stone-400 block uppercase font-bold">Spiritual Mentor</span>
+                      <span className="font-semibold text-stone-800">{person.spiritualMentor}</span>
+                    </div>
+                  )}
+                  {person.japaDailyRounds > 0 && (
+                    <div>
+                      <span className="text-[10px] text-stone-400 block uppercase font-bold">Daily Japa Rounds</span>
+                      <span className="font-semibold text-stone-800">📿 {person.japaDailyRounds} Rounds</span>
+                    </div>
+                  )}
                 </div>
 
                 {person.notes && (
                   <div className="pt-2 border-t border-stone-100 text-xs">
                     <span className="text-[10px] text-stone-400 block uppercase font-bold">Notes / Background</span>
-                    <p className="text-stone-700 mt-0.5 whitespace-pre-wrap text-[11px] bg-stone-50 p-2 rounded-lg border border-stone-200">
+                    <p className="text-stone-700 mt-1 whitespace-pre-wrap text-xs bg-stone-50 p-2.5 rounded-xl border border-stone-200">
                       {person.notes}
                     </p>
                   </div>
                 )}
               </div>
+            )}
+          </div>
 
-              {/* Course-Wise Attendance Matrix (Docx Section 1.5) */}
-              <div className="p-4 bg-white border border-[#E5D8B8] rounded-2xl space-y-3 shadow-xs">
-                <div className="flex items-center justify-between border-b border-stone-100 pb-2 flex-wrap gap-2">
-                  <h5 className="text-xs font-bold uppercase tracking-wider text-[#08415C] flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 text-[#08415C]" /> Course-Wise Attendance &amp; Batches
-                  </h5>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-stone-500 font-medium">
-                      {person.courseEnrollments?.length || 0} Connected
-                    </span>
-                    {hasPermission("courses:manage") && (
-                      <button
-                        type="button"
-                        onClick={() => setIsEnrollingCourse((prev) => !prev)}
-                        className="px-2.5 py-1 bg-[#08415C] hover:bg-[#063349] text-white rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-gold transition"
-                      >
-                        <Plus className="w-3 h-3 text-[#D4AF37]" />
-                        <span>+ Add Course / Batch</span>
-                      </button>
-                    )}
-                  </div>
+          {/* PRIORITY 5 – COURSES & BATCHES (Collapsed Accordion by default) */}
+          <div className="bg-white border border-[#E5D8B8] rounded-2xl shadow-xs overflow-hidden">
+            <div className="p-3 px-3.5 bg-[#FFFDF8] flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsCoursesOpen(!isCoursesOpen)}
+                className="flex-1 flex items-center justify-between text-left mr-2"
+              >
+                <span className="text-xs font-bold text-[#08415C] flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-[#08415C]" />
+                  <span>Courses &amp; Batches ({person.courseEnrollments?.length || 0})</span>
+                </span>
+                <div className="flex items-center gap-1.5 text-stone-400">
+                  {isCoursesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </div>
+              </button>
 
-                {/* Inline Course & Batch Enrollment Selector */}
+              {hasPermission("courses:manage") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCoursesOpen(true);
+                    setIsEnrollingCourse(true);
+                    if (coursesList.length === 0) fetchCoursesList();
+                  }}
+                  className="text-[11px] font-bold text-[#08415C] hover:text-[#063349] hover:underline flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>Add / Enroll</span>
+                </button>
+              )}
+            </div>
+
+            {isCoursesOpen && (
+              <div className="p-3.5 border-t border-stone-100 text-xs space-y-3">
                 {isEnrollingCourse && (
                   <form onSubmit={handleEnrollInBatch} className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2 text-xs">
                     <span className="font-bold text-[#08415C] block">Select Course &amp; Batch for {person.fullName}:</span>
@@ -736,7 +1130,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                                 </option>
                               ))
                             ) : (
-                              <option disabled value="">(No active batches created in this course)</option>
+                              <option disabled value="">(No active batches created)</option>
                             )}
                           </optgroup>
                         ))}
@@ -752,7 +1146,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                         <button
                           type="submit"
                           disabled={enrollingLoading || !selectedEnrollBatchId}
-                          className="px-3.5 py-1.5 bg-[#08415C] hover:bg-[#063349] text-white rounded-lg font-bold shadow-gold disabled:opacity-50 flex items-center gap-1"
+                          className="px-3.5 py-1.5 bg-[#08415C] hover:bg-[#063349] text-white rounded-lg font-bold shadow-xs disabled:opacity-50 flex items-center gap-1"
                         >
                           <span>{enrollingLoading ? "Enrolling..." : "Enroll Now"}</span>
                         </button>
@@ -767,9 +1161,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                       <thead>
                         <tr className="border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500">
                           <th className="py-2">Course &amp; Batch</th>
-                          <th className="py-2">Registered</th>
                           <th className="py-2">Attendance</th>
-                          <th className="py-2">Regular</th>
                           <th className="py-2">Status</th>
                           {hasPermission("courses:manage") && <th className="py-2 text-right">Action</th>}
                         </tr>
@@ -778,7 +1170,6 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                         {person.courseEnrollments.map((enr: any) => {
                           const attendedSessions = enr.attendances?.filter((a: any) => a.attended).length || 0;
                           const totalSessions = enr.attendances?.length || 8;
-                          const isRegular = enr.status === "REGULAR" || (attendedSessions / Math.max(totalSessions, 1)) >= 0.75;
 
                           return (
                             <tr key={enr.id} className="hover:bg-stone-50">
@@ -790,20 +1181,8 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                                   </span>
                                 )}
                               </td>
-                              <td className="py-2.5">
-                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 font-bold">
-                                  Yes
-                                </span>
-                              </td>
                               <td className="py-2.5 font-mono font-semibold">
                                 {attendedSessions} / {totalSessions}
-                              </td>
-                              <td className="py-2.5">
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                  isRegular ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                                }`}>
-                                  {isRegular ? "Yes" : "No"}
-                                </span>
                               </td>
                               <td className="py-2.5">
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-stone-100 text-stone-700">
@@ -816,7 +1195,7 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                                     type="button"
                                     onClick={() => handleUnenrollFromBatch(enr.id, enr.batch?.batchName || enr.course?.title)}
                                     className="p-1 hover:bg-rose-50 text-stone-400 hover:text-rose-600 rounded transition"
-                                    title="Remove member from this batch"
+                                    title="Remove member"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -829,10 +1208,8 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                     </table>
                   </div>
                 ) : (
-                  <div className="p-4 bg-stone-50 rounded-xl text-center space-y-2.5">
-                    <p className="text-xs text-stone-500">
-                      No course enrollments linked yet to {person.fullName}.
-                    </p>
+                  <div className="p-4 bg-stone-50 rounded-xl text-center space-y-2">
+                    <p className="text-xs text-stone-500">No course enrollments linked yet to {person.fullName}.</p>
                     {hasPermission("courses:manage") && (
                       <button
                         type="button"
@@ -840,271 +1217,102 @@ export const PersonModal: React.FC<PersonModalProps> = ({
                           setIsEnrollingCourse(true);
                           if (coursesList.length === 0) fetchCoursesList();
                         }}
-                        className="px-3.5 py-1.5 bg-[#08415C] hover:bg-[#063349] text-white rounded-xl text-xs font-bold shadow-gold inline-flex items-center gap-1.5 transition"
+                        className="px-3.5 py-1.5 bg-[#08415C] text-white rounded-xl text-xs font-bold inline-flex items-center gap-1 shadow-xs"
                       >
                         <Plus className="w-3.5 h-3.5 text-[#D4AF37]" />
-                        <span>+ Enroll {person.fullName} in Course / Batch</span>
+                        <span>Enroll Devotee in Course / Batch</span>
                       </button>
                     )}
                   </div>
                 )}
               </div>
+            )}
+          </div>
 
-              {/* Calling & Follow-up History */}
-              <div className="p-4 bg-white border border-[#E5D8B8] rounded-2xl space-y-3 shadow-xs">
-                <h5 className="text-xs font-bold uppercase tracking-wider text-[#08415C] border-b border-stone-100 pb-2 flex items-center gap-1.5">
-                  <PhoneCall className="w-3.5 h-3.5 text-[#00A896]" /> Calling Sewa History ({person.callLogs?.length || 0})
-                </h5>
+          {/* PRIORITY 6 – CALLING SEWA HISTORY (Collapsed Accordion by default) */}
+          <div className="bg-white border border-[#E5D8B8] rounded-2xl shadow-xs overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setIsCallingHistoryOpen(!isCallingHistoryOpen)}
+              className="w-full p-3 px-3.5 bg-[#FFFDF8] hover:bg-stone-50 flex items-center justify-between text-left transition"
+            >
+              <span className="text-xs font-bold text-[#08415C] flex items-center gap-2">
+                <PhoneCall className="w-4 h-4 text-[#00A896]" />
+                <span>Calling Sewa History ({person.callLogs?.length || 0})</span>
+              </span>
+              <div className="flex items-center gap-1.5 text-stone-400">
+                {isCallingHistoryOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </div>
+            </button>
 
+            {isCallingHistoryOpen && (
+              <div className="p-3.5 border-t border-stone-100 text-xs space-y-2">
                 {person.callLogs && person.callLogs.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {person.callLogs.map((log: any) => (
-                      <div key={log.id} className="p-2.5 bg-[#FAF8F5] border border-[#E5D8B8] rounded-xl text-xs space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-[#08415C]">
-                            {log.callType} • <span className="text-emerald-700">{log.outcome.replace(/_/g, " ")}</span>
+                  person.callLogs.map((log: any) => (
+                    <div key={log.id} className="p-2.5 bg-[#FAF8F5] border border-[#E5D8B8] rounded-xl text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#08415C] flex items-center gap-1.5">
+                          <span>{log.callType}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            {log.outcome.replace(/_/g, " ")}
                           </span>
-                          <span className="text-[10px] text-stone-500">
-                            {new Date(log.createdAt).toLocaleDateString("en-IN")}
-                          </span>
-                        </div>
-                        {log.notes && <p className="text-stone-700 text-[11px]">{log.notes}</p>}
-                        <div className="text-[10px] text-[#B8860B]">
-                          Called by: {log.volunteer?.name || "Volunteer"}
-                        </div>
+                        </span>
+                        <span className="text-[10px] text-stone-500 font-mono">
+                          {new Date(log.createdAt).toLocaleDateString("en-IN")}
+                        </span>
                       </div>
-                    ))}
-                  </div>
+                      {log.notes && <p className="text-stone-700 text-xs italic">&quot;{log.notes}&quot;</p>}
+                      <div className="text-[10px] text-[#B8860B]">
+                        Called by: {log.volunteer?.name || "Volunteer"}
+                      </div>
+                    </div>
+                  ))
                 ) : (
                   <p className="text-xs text-stone-500 italic p-2 text-center">No previous call records.</p>
                 )}
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* RIGHT SIDE (5 Cols) – ODOO-STYLE ACTIVITY MANAGEMENT & LOGS */}
-            <div className="lg:col-span-5 space-y-4">
-              {/* Odoo Style Activity Summary Banner */}
-              <div className="p-3.5 bg-[#FAF8F5] border-2 border-[#D4AF37]/50 rounded-2xl space-y-2.5 shadow-xs">
-                <h5 className="text-xs font-bold uppercase tracking-wider text-[#08415C] flex items-center gap-1.5">
-                  <CalendarClock className="w-4 h-4 text-[#D4AF37]" /> Activity Status Summary
-                </h5>
-
-                <div className="space-y-2 text-xs">
-                  {/* Last Call */}
-                  <div className="p-2.5 bg-white rounded-xl border border-stone-200">
-                    <span className="text-[10px] text-stone-400 uppercase font-bold block">Last Call Activity</span>
-                    {lastCall ? (
-                      <div className="mt-0.5">
-                        <div className="font-bold text-stone-900 flex items-center justify-between">
-                          <span>{lastCall.outcome.replace(/_/g, " ")}</span>
-                          <span className="text-[10px] text-stone-500 font-normal">
-                            {new Date(lastCall.createdAt).toLocaleDateString("en-IN")}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-stone-600 line-clamp-1">{lastCall.notes || "No notes"}</p>
-                        <span className="text-[10px] text-stone-500">By: {lastCall.volunteer?.name || "Volunteer"}</span>
-                      </div>
-                    ) : (
-                      <span className="text-stone-500 italic text-[11px]">No call logged yet</span>
-                    )}
-                  </div>
-
-                  {/* Next Follow-up Date */}
-                  <div className="p-2.5 bg-white rounded-xl border border-stone-200">
-                    <span className="text-[10px] text-stone-400 uppercase font-bold block">Next Follow-up Task</span>
-                    {nextFollowup ? (
-                      <div className="mt-0.5 flex items-center justify-between">
-                        <div>
-                          <p className="font-bold text-amber-900">{nextFollowup.type}</p>
-                          <p className="text-[11px] text-stone-600">{nextFollowup.remarks || "Pending follow-up"}</p>
-                        </div>
-                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                          Due: {new Date(nextFollowup.dueDate).toLocaleDateString("en-IN")}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-stone-500 italic text-[11px]">No pending follow-up scheduled</span>
-                    )}
-                  </div>
-                </div>
+          {/* PRIORITY 7 – CHRONOLOGICAL ACTIVITY STREAM (Collapsed Accordion by default) */}
+          <div className="bg-white border border-[#E5D8B8] rounded-2xl shadow-xs overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setIsActivityStreamOpen(!isActivityStreamOpen)}
+              className="w-full p-3 px-3.5 bg-[#FFFDF8] hover:bg-stone-50 flex items-center justify-between text-left transition"
+            >
+              <span className="text-xs font-bold text-[#08415C] flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[#D4AF37]" />
+                <span>Chronological Activity Stream</span>
+              </span>
+              <div className="flex items-center gap-1.5 text-stone-400">
+                {isActivityStreamOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </div>
+            </button>
 
-              {/* Direct Activity Action Panel (Odoo Style) */}
-              <div className="p-4 bg-white border border-[#E5D8B8] rounded-2xl space-y-3 shadow-xs">
-                {/* Action Tabs */}
-                <div className="flex border-b border-stone-200 pb-2 gap-1 text-xs font-bold">
-                  <button
-                    type="button"
-                    onClick={() => setActiveRightTab("log_call")}
-                    className={`flex-1 py-1.5 px-2 rounded-lg text-center transition ${
-                      activeRightTab === "log_call" ? "bg-[#08415C] text-white shadow-xs" : "text-stone-600 hover:bg-stone-50"
-                    }`}
-                  >
-                    📞 Log Call
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveRightTab("add_task")}
-                    className={`flex-1 py-1.5 px-2 rounded-lg text-center transition ${
-                      activeRightTab === "add_task" ? "bg-[#08415C] text-white shadow-xs" : "text-stone-600 hover:bg-stone-50"
-                    }`}
-                  >
-                    📅 Follow-up
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveRightTab("add_note")}
-                    className={`flex-1 py-1.5 px-2 rounded-lg text-center transition ${
-                      activeRightTab === "add_note" ? "bg-[#08415C] text-white shadow-xs" : "text-stone-600 hover:bg-stone-50"
-                    }`}
-                  >
-                    📝 Note
-                  </button>
-                </div>
-
-                {/* TAB 1: Log Call Action */}
-                {activeRightTab === "log_call" && (
-                  <form onSubmit={handleLogCall} className="space-y-2.5 text-xs">
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-600 uppercase mb-1">Call Disposition / Outcome</label>
-                      <select
-                        value={callOutcome}
-                        onChange={(e) => setCallOutcome(e.target.value)}
-                        className="w-full p-2 border border-stone-300 rounded-lg bg-white font-semibold text-xs"
-                      >
-                        <option value="YES_WILL_ATTEND">✓ Yes, Will Attend</option>
-                        <option value="NO_WILL_NOT_ATTEND">✗ No, Will Not Attend</option>
-                        <option value="CALL_NOT_PICKED">📞 Call Not Picked</option>
-                        <option value="NOT_CONFIRMED">❓ Not Confirmed</option>
-                        <option value="CONFIRM_LATER">⏰ Confirm Later</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-600 uppercase mb-1">What was discussed? *</label>
-                      <textarea
-                        rows={2}
-                        required
-                        value={callNotes}
-                        onChange={(e) => setCallNotes(e.target.value)}
-                        placeholder="Details of the discussion, devotee response..."
-                        className="w-full p-2 border border-stone-300 rounded-lg outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-600 uppercase mb-1">Schedule Next Follow-up (Optional)</label>
-                      <input
-                        type="date"
-                        value={callNextDate}
-                        onChange={(e) => setCallNextDate(e.target.value)}
-                        className="w-full p-2 border border-stone-300 rounded-lg bg-white"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={actionSubmitting}
-                      className="w-full py-2 bg-[#00A896] hover:bg-[#028090] text-white font-bold rounded-xl shadow-xs transition"
-                    >
-                      {actionSubmitting ? "Recording..." : "Save Call Activity"}
-                    </button>
-                  </form>
-                )}
-
-                {/* TAB 2: Add Follow-up Task */}
-                {activeRightTab === "add_task" && (
-                  <form onSubmit={handleAddTask} className="space-y-2.5 text-xs">
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-600 uppercase mb-1">Task Type</label>
-                      <select
-                        value={taskType}
-                        onChange={(e) => setTaskType(e.target.value)}
-                        className="w-full p-2 border border-stone-300 rounded-lg bg-white font-semibold"
-                      >
-                        <option value="Calling">Follow-up Call</option>
-                        <option value="WhatsApp">WhatsApp Reminder</option>
-                        <option value="Course Follow-up">Course Absentee Follow-up</option>
-                        <option value="Relationship Call">Counseling Session</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-600 uppercase mb-1">Due Date *</label>
-                      <input
-                        type="date"
-                        required
-                        value={taskDueDate}
-                        onChange={(e) => setTaskDueDate(e.target.value)}
-                        className="w-full p-2 border border-stone-300 rounded-lg bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-600 uppercase mb-1">Task Remarks</label>
-                      <input
-                        type="text"
-                        value={taskRemarks}
-                        onChange={(e) => setTaskRemarks(e.target.value)}
-                        placeholder="e.g. Inquire about BG Chapter 2 notes..."
-                        className="w-full p-2 border border-stone-300 rounded-lg"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={actionSubmitting}
-                      className="w-full py-2 bg-[#08415C] hover:bg-[#063349] text-white font-bold rounded-xl shadow-xs transition"
-                    >
-                      {actionSubmitting ? "Saving..." : "Create Follow-up Task"}
-                    </button>
-                  </form>
-                )}
-
-                {/* TAB 3: Add Note */}
-                {activeRightTab === "add_note" && (
-                  <form onSubmit={handleAddNote} className="space-y-2.5 text-xs">
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-600 uppercase mb-1">Append Note to Profile</label>
-                      <textarea
-                        rows={3}
-                        required
-                        value={newNote}
-                        onChange={(e) => setNewNote(e.target.value)}
-                        placeholder="Add important notes or personal context..."
-                        className="w-full p-2 border border-stone-300 rounded-lg outline-none"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={actionSubmitting}
-                      className="w-full py-2 bg-[#08415C] hover:bg-[#063349] text-white font-bold rounded-xl shadow-xs transition"
-                    >
-                      {actionSubmitting ? "Adding..." : "Add Note to Dossier"}
-                    </button>
-                  </form>
-                )}
-              </div>
-
-              {/* Activity Timeline Stream */}
-              <div className="p-3.5 bg-white border border-[#E5D8B8] rounded-2xl space-y-2.5 max-h-60 overflow-y-auto">
-                <span className="text-[10px] text-stone-400 uppercase font-bold block">
-                  Chronological Activity Stream
-                </span>
-                <div className="space-y-2 text-xs">
-                  {person.timelineEvents && person.timelineEvents.map((evt: any) => (
+            {isActivityStreamOpen && (
+              <div className="p-3.5 border-t border-stone-100 text-xs space-y-2">
+                {person.timelineEvents && person.timelineEvents.length > 0 ? (
+                  person.timelineEvents.map((evt: any) => (
                     <div key={evt.id} className="p-2 bg-[#FAF8F5] border border-stone-200 rounded-lg">
                       <div className="flex items-center justify-between text-[10px] text-stone-500">
                         <span className="font-bold text-[#08415C]">{evt.title}</span>
                         <span>{new Date(evt.createdAt).toLocaleDateString("en-IN")}</span>
                       </div>
-                      {evt.description && <p className="text-stone-700 mt-0.5 text-[11px]">{evt.description}</p>}
+                      {evt.description && <p className="text-stone-700 mt-0.5 text-xs">{evt.description}</p>}
                     </div>
-                  ))}
-                </div>
+                  ))
+                ) : (
+                  <div className="p-2.5 bg-[#FAF8F5] border border-stone-200 rounded-lg text-xs space-y-1">
+                    <div className="flex items-center justify-between text-[10px] text-stone-500">
+                      <span className="font-bold text-[#08415C]">Devotee Registered</span>
+                      <span>{new Date(person.createdAt).toLocaleDateString("en-IN")}</span>
+                    </div>
+                    <p className="text-stone-600 text-[11px]">Registered as {person.stage} in Chandkheda CRM</p>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
