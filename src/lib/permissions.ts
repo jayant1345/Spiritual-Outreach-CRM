@@ -281,9 +281,23 @@ export function getUserAssignedBatchIds(
 }
 
 /**
+ * Returns true if user is restricted to specific batch(es).
+ * Super Admins and Admins have global access.
+ * Non-admins with explicit batch assignments are restricted to those batches.
+ */
+export function isUserBatchRestricted(
+  user: { role?: string | null; privileges?: string[] | null } | null | undefined
+): boolean {
+  if (!user || !user.role) return false;
+  if (user.role === "SUPER_ADMIN" || user.role === "ADMIN") return false;
+  const assigned = getUserAssignedBatchIds(user);
+  return assigned.length > 0;
+}
+
+/**
  * Checks whether user has permission to view or manage a specific batch.
- * Super Admins, Admins, and Coordinators have unrestricted access unless restricted.
- * Volunteers with assigned batches can only access their permitted batches.
+ * Super Admins and Admins have unrestricted access.
+ * Users with assigned batches can only access their permitted batches.
  */
 export function userHasBatchAccess(
   user: { role?: string | null; privileges?: string[] | null } | null | undefined,
@@ -303,4 +317,5 @@ export function userHasBatchAccess(
   // Otherwise unassigned volunteer has no access if batch restrictions are active
   return true;
 }
+
 

@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { hasPermission, getUserAssignedBatchIds } from "@/lib/permissions";
+import { hasPermission, getUserAssignedBatchIds, isUserBatchRestricted } from "@/lib/permissions";
 
 export async function GET(request: Request) {
   try {
     const currentUser = await getCurrentUser(request);
     const userBatchIds = getUserAssignedBatchIds(currentUser);
-    const isRestrictedVolunteer =
-      currentUser &&
-      !hasPermission(currentUser, "courses:manage") &&
-      userBatchIds.length > 0;
+    const isRestrictedVolunteer = isUserBatchRestricted(currentUser);
 
     // Load batch volunteer assignments from privileges
     const usersWithBatches = await prisma.user.findMany({

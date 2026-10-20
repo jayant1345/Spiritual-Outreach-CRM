@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { getUserAssignedBatchIds } from "@/lib/permissions";
+import { getUserAssignedBatchIds, isUserBatchRestricted } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     const isPersonalScope = !canViewAll || scope === "me";
 
     const userBatchIds = getUserAssignedBatchIds(currentUser);
-    const hasBatchRestrictions = !canViewAll && userBatchIds.length > 0;
+    const hasBatchRestrictions = isUserBatchRestricted(currentUser);
 
     // 1. Workspace Filtering (Course & Batches)
     const rawParsedBatchIds = batchIdsParam

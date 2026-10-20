@@ -4,16 +4,22 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Badge from "@/components/common/Badge";
 import Modal from "@/components/common/Modal";
-import { UserCog, Phone, Mail, CheckCircle2, PhoneCall, Plus, Shield, Key, UserCheck, UserX, HeartHandshake, User } from "lucide-react";
+import { UserCog, Phone, Mail, CheckCircle2, PhoneCall, Plus, Shield, Key, UserCheck, UserX, HeartHandshake, User, ShieldCheck, Layers } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import AssignUserBatchesModal from "@/components/volunteers/AssignUserBatchesModal";
 
 export default function VolunteersPage() {
-  const { user: currentUser, isCoordinator } = useAuth();
+  const { user: currentUser, isCoordinator, isAdmin, isTeamLeader } = useAuth();
+  const canAllocateBatches = isAdmin || isTeamLeader || isCoordinator;
+
   const [volunteers, setVolunteers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [selectedUserForPassword, setSelectedUserForPassword] = useState<any>(null);
+  const [isBatchAllocationOpen, setIsBatchAllocationOpen] = useState(false);
+  const [selectedUserForBatches, setSelectedUserForBatches] = useState<any>(null);
+  const [allBatchesMap, setAllBatchesMap] = useState<Record<string, { batchName: string; courseTitle: string }>>({});
   const [newPassword, setNewPassword] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "ALL" | "INACTIVE">("ACTIVE");
 
@@ -39,6 +45,27 @@ export default function VolunteersPage() {
         const fbRes = await fetch("/api/volunteers?includeInactive=true");
         const fbData = await fbRes.json();
         if (Array.isArray(fbData)) setVolunteers(fbData);
+      }
+
+      // Fetch courses & batches to map batch names
+      try {
+        const cRes = await fetch("/api/courses");
+        if (cRes.ok) {
+          const cData = await cRes.json();
+          if (Array.isArray(cData)) {
+            const bMap: Record<string, { batchName: string; courseTitle: string }> = {};
+            cData.forEach((course: any) => {
+              if (Array.isArray(course.batches)) {
+                course.batches.forEach((b: any) => {
+                  bMap[b.id] = { batchName: b.batchName, courseTitle: course.title };
+                });
+              }
+            });
+            setAllBatchesMap(bMap);
+          }
+        }
+      } catch (cErr) {
+        console.error("Error loading courses for batch mapping:", cErr);
       }
     } catch (err) {
       console.error(err);
@@ -307,6 +334,63 @@ export default function VolunteersPage() {
                   <div className="text-[10px] text-amber-600">Pending Tasks</div>
                 </Link>
               </div>
+
+              {/* Assigned Batch Sewa Tags */}
+              <div className="pt-2 border-t border-[#E5D8B8]/60">
+                <div className="flex items-center justify-between gap-1 mb-1.5">
+                  <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1">
+                    <Layers className="w-3 h-3 text-[#00A896]" />
+                    <span>Assigned Batch Sewa</span>
+                  </span>
+                  {canAllocateBatches && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedUserForBatches(vol);
+                        setIsBatchAllocationOpen(true);
+                      }}
+                      className="px-2 py-0.5 bg-[#FAF5E6] hover:bg-[#F2E7CA] border border-[#D4AF37] text-[#08415C] text-[10px] font-bold rounded-md flex items-center gap-1 shadow-2xs transition"
+                      title="Assign / Edit Batch Sewa Rights"
+                    >
+                      <ShieldCheck className="w-3 h-3 text-[#D4AF37]" />
+                      <span>Allocate Batches</span>
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap min-h-[22px]">
+                  {(() => {
+                    let privs: string[] = [];
+                    try {
+                      if (Array.isArray(vol.privileges)) privs = vol.privileges;
+                      else if (typeof vol.privileges === "string") privs = JSON.parse(vol.privileges);
+                    } catch {
+                      privs = [];
+                    }
+                    const batchTags = privs
+                      .filter((p) => typeof p === "string" && p.startsWith("batch:"))
+                      .map((p) => p.replace("batch:", "").trim());
+
+                    if (batchTags.length === 0) {
+                      return (
+                        <span className="text-[10px] text-stone-400 italic">
+                          All Batches (Global Access)
+                        </span>
+                      );
+                    }
+                    return batchTags.map((bId) => {
+                      const info = allBatchesMap[bId];
+                      return (
+                        <span
+                          key={bId}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#FAF5E6] text-[#08415C] border border-[#D4AF37]/50"
+                        >
+                          🎯 {info?.courseTitle ? `${info.courseTitle}: ` : ""}{info?.batchName || bId}
+                        </span>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
             </div>
 
             {isCoordinator && (
@@ -317,9 +401,10 @@ export default function VolunteersPage() {
                   className="text-[11px] font-semibold bg-stone-50 border border-stone-200 rounded-lg px-2 py-1 outline-none text-stone-700"
                 >
                   <option value="SUPER_ADMIN">👑 Super Admin</option>
+                  <option value="TEAM_LEADER">⚡ Team Leader</option>
                   <option value="COORDINATOR">🛠️ Coordinator</option>
-                  <option value="CALLING_VOLUNTEER">📞 Caller</option>
-                  <option value="RELATIONSHIP_VOLUNTEER">🤝 Counselor</option>
+                  <option value="CALLING_VOLUNTEER">📞 Calling Volunteer</option>
+                  <option value="RELATIONSHIP_VOLUNTEER">🤝 Relationship Volunteer</option>
                 </select>
 
                 <div className="flex items-center gap-1.5">
@@ -515,6 +600,19 @@ export default function VolunteersPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Batch Allocation Modal */}
+      <AssignUserBatchesModal
+        isOpen={isBatchAllocationOpen}
+        onClose={() => {
+          setIsBatchAllocationOpen(false);
+          setSelectedUserForBatches(null);
+        }}
+        user={selectedUserForBatches}
+        onAssigned={() => {
+          fetchUsers();
+        }}
+      />
     </div>
   );
 }

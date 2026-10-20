@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { hasPermission, getUserAssignedBatchIds } from "@/lib/permissions";
+import { hasPermission, getUserAssignedBatchIds, isUserBatchRestricted } from "@/lib/permissions";
 
 export async function GET(request: Request) {
   try {
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     // RBAC: Check whether user can view all devotees or only their assigned contacts/batches
     const canViewAll = currentUser ? hasPermission(currentUser, "devotees:view_all") : false;
     const userBatchIds = getUserAssignedBatchIds(currentUser);
-    const hasBatchRestrictions = !canViewAll && userBatchIds.length > 0;
+    const hasBatchRestrictions = isUserBatchRestricted(currentUser);
 
     if (hasBatchRestrictions) {
       // Devotee is assigned to specific batch(es) for calling / devotee care sewa:
@@ -30,7 +30,10 @@ export async function GET(request: Request) {
         },
       };
       if (volunteerId && volunteerId !== "ALL") {
-        where.assignedVolunteerId = volunteerId;
+        where.OR = [
+          { assignedVolunteerId: volunteerId },
+          { assignedVolunteerId: null },
+        ];
       }
     } else if (!canViewAll && currentUser) {
       if (currentUser.role === "CALLING_VOLUNTEER") {

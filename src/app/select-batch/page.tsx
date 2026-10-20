@@ -32,16 +32,9 @@ export default function SelectBatchPage() {
   const [chosenBatchIds, setChosenBatchIds] = useState<string[]>([]);
   const [autoRedirecting, setAutoRedirecting] = useState<boolean>(false);
 
-  // Calling Volunteer protection: redirect directly to calling desk
+  // If user has only 1 batch assigned across all courses, auto-select and proceed
   useEffect(() => {
-    if (!authLoading && user && isCallingVolunteer) {
-      router.replace("/calling-sewa");
-    }
-  }, [user, authLoading, isCallingVolunteer, router]);
-
-  // If coordinator has only 1 batch assigned, auto-select and proceed as per PRD
-  useEffect(() => {
-    if (!loadingCourses && courses.length > 0 && isCoordinator && !isAdmin) {
+    if (!loadingCourses && courses.length > 0 && !isAdmin) {
       const allBatches = courses.flatMap((c) => c.batches);
       if (allBatches.length === 1) {
         setAutoRedirecting(true);
@@ -49,11 +42,15 @@ export default function SelectBatchPage() {
         const parentCourse = courses.find((c) => c.batches.some((b) => b.id === singleBatch.id));
         setWorkspace(parentCourse?.id || "ALL", [singleBatch.id]);
         setTimeout(() => {
-          router.push("/");
+          if (isCallingVolunteer) {
+            router.push("/calling-sewa");
+          } else {
+            router.push("/");
+          }
         }, 800);
       }
     }
-  }, [loadingCourses, courses, isCoordinator, isAdmin, setWorkspace, router]);
+  }, [loadingCourses, courses, isCallingVolunteer, isAdmin, setWorkspace, router]);
 
   const chosenCourse = courses.find((c) => c.id === chosenCourseId);
   const courseBatches = chosenCourse?.batches || [];

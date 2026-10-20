@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { hasPermission, getUserAssignedBatchIds } from "@/lib/permissions";
+import { hasPermission, getUserAssignedBatchIds, isUserBatchRestricted } from "@/lib/permissions";
 
 export async function GET(request: Request) {
   try {
@@ -23,10 +23,10 @@ export async function GET(request: Request) {
       where.outcome = outcome;
     }
 
-    // Restrict calls to assigned batch devotees if volunteer has batch restrictions
-    const canViewAll = currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "COORDINATOR" || hasPermission(currentUser, "reports:view");
+    // Restrict calls to assigned batch devotees if user has batch restrictions
     const userBatchIds = getUserAssignedBatchIds(currentUser);
-    if (!canViewAll && userBatchIds.length > 0) {
+    const hasBatchRestrictions = isUserBatchRestricted(currentUser);
+    if (hasBatchRestrictions) {
       where.person = {
         courseEnrollments: {
           some: {

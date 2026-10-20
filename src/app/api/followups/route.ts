@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { getUserAssignedBatchIds } from "@/lib/permissions";
+import { getUserAssignedBatchIds, isUserBatchRestricted } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +17,9 @@ export async function GET(request: Request) {
     if (status !== "ALL") where.status = status;
 
     // User isolation with batch coordination support:
-    const canViewAll = currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "COORDINATOR";
+    const canViewAll = currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "ADMIN";
     const userBatchIds = getUserAssignedBatchIds(currentUser);
-    const hasBatchRestrictions = !canViewAll && userBatchIds.length > 0;
+    const hasBatchRestrictions = isUserBatchRestricted(currentUser);
 
     if (volunteerId && volunteerId !== "ALL") {
       where.volunteerId = volunteerId;

@@ -1,14 +1,83 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermission, getUserAssignedBatchIds, isUserBatchRestricted } from "@/lib/permissions";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const batchId = searchParams.get("batchId");
+    const userId = searchParams.get("userId");
 
-    // 1. If batchId is specified: return assigned users and all active volunteers for selection
+    // 1. If userId is specified: return user's assigned batches and all courses/batches for allocation
+    if (userId) {
+      const targetUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          privileges: true,
+        },
+      });
+
+      if (!targetUser) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+
+      let userPrivs: string[] = [];
+      try {
+        if (targetUser.privileges) userPrivs = JSON.parse(targetUser.privileges);
+      } catch {
+        userPrivs = [];
+      }
+      if (!Array.isArray(userPrivs)) userPrivs = [];
+
+      const assignedBatchIds = userPrivs
+        .filter((p) => typeof p === "string" && p.startsWith("batch:"))
+        .map((p) => p.replace("batch:", "").trim());
+
+      const courses = await prisma.course.findMany({
+        orderBy: { startDate: "desc" },
+        include: {
+          batches: {
+            orderBy: { startDate: "desc" },
+            select: {
+              id: true,
+              batchName: true,
+              scheduleInfo: true,
+              active: true,
+            },
+          },
+        },
+      });
+
+      const coursesWithAssignment = courses.map((course) => ({
+        id: course.id,
+        title: course.title,
+        courseType: course.courseType,
+        batches: course.batches.map((batch) => ({
+          ...batch,
+          isAssigned: assignedBatchIds.includes(batch.id),
+        })),
+      }));
+
+      return NextResponse.json({
+        user: {
+          id: targetUser.id,
+          name: targetUser.name,
+          email: targetUser.email,
+          phone: targetUser.phone,
+          role: targetUser.role,
+        },
+        assignedBatchIds,
+        courses: coursesWithAssignment,
+      });
+    }
+
+    // 2. If batchId is specified: return assigned users and all active volunteers for selection
     if (batchId) {
       const batch = await prisma.courseBatch.findUnique({
         where: { id: batchId },
@@ -77,7 +146,7 @@ export async function GET(request: Request) {
       });
     }
 
-    // 2. If no batchId: return a mapping of all batchIds to their assigned volunteers
+    // 3. If no batchId and no userId: return a mapping of all batchIds to their assigned volunteers
     const usersWithBatches = await prisma.user.findMany({
       where: {
         active: true,
@@ -93,6 +162,7 @@ export async function GET(request: Request) {
     });
 
     const batchMap: Record<string, any[]> = {};
+    const userBatchMap: Record<string, string[]> = {};
 
     for (const u of usersWithBatches) {
       let privs: string[] = [];
@@ -103,9 +173,12 @@ export async function GET(request: Request) {
       }
 
       if (Array.isArray(privs)) {
+        userBatchMap[u.id] = [];
         for (const p of privs) {
           if (typeof p === "string" && p.startsWith("batch:")) {
             const bId = p.replace("batch:", "").trim();
+            userBatchMap[u.id].push(bId);
+
             if (!batchMap[bId]) batchMap[bId] = [];
             batchMap[bId].push({
               id: u.id,
@@ -118,7 +191,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ batchMap });
+    return NextResponse.json({ batchMap, userBatchMap });
   } catch (error: any) {
     console.error("Error fetching batch volunteers:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -128,18 +201,70 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const currentUser = await getCurrentUser(request);
-    if (!currentUser || !hasPermission(currentUser, "courses:manage")) {
+    const canManage =
+      currentUser &&
+      (currentUser.role === "SUPER_ADMIN" ||
+        currentUser.role === "ADMIN" ||
+        currentUser.role === "TEAM_LEADER" ||
+        hasPermission(currentUser, "courses:manage"));
+
+    if (!canManage) {
       return NextResponse.json(
-        { error: "Unauthorized. Courses management permission required to assign batch rights." },
+        { error: "Unauthorized. Admin or Authorized Team Leader rights required to allocate batch sewa." },
         { status: 403 }
       );
     }
 
     const body = await request.json();
-    const { batchId, volunteerIds } = body;
+    const { batchId, volunteerIds, userId, batchIds } = body;
 
+    // Mode A: Assign multiple batches across courses to a specific user (User -> Batches)
+    if (userId) {
+      if (!Array.isArray(batchIds)) {
+        return NextResponse.json({ error: "batchIds must be an array of batch IDs" }, { status: 400 });
+      }
+
+      const targetUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, privileges: true },
+      });
+
+      if (!targetUser) {
+        return NextResponse.json({ error: "Target user not found" }, { status: 404 });
+      }
+
+      let currentPrivs: string[] = [];
+      try {
+        if (targetUser.privileges) currentPrivs = JSON.parse(targetUser.privileges);
+      } catch {
+        currentPrivs = [];
+      }
+      if (!Array.isArray(currentPrivs)) currentPrivs = [];
+
+      // Remove any existing batch tags
+      const nonBatchPrivs = currentPrivs.filter((p) => typeof p !== "string" || !p.startsWith("batch:"));
+      // Add new batch tags
+      const newBatchTags = batchIds.map((bId) => `batch:${bId}`);
+      const updatedPrivs = [...nonBatchPrivs, ...newBatchTags];
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          privileges: updatedPrivs.length > 0 ? JSON.stringify(updatedPrivs) : null,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        userId,
+        userName: targetUser.name,
+        assignedBatchIds: batchIds,
+      });
+    }
+
+    // Mode B: Assign multiple volunteers to a specific batch (Batch -> Volunteers)
     if (!batchId) {
-      return NextResponse.json({ error: "Batch ID is required" }, { status: 400 });
+      return NextResponse.json({ error: "batchId or userId is required" }, { status: 400 });
     }
 
     if (!Array.isArray(volunteerIds)) {
