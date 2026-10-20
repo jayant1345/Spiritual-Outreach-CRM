@@ -2,7 +2,20 @@
 
 import React, { useState, useEffect, useContext } from "react";
 import { Modal } from "../common/Modal";
-import { User, Users, AlertTriangle, ExternalLink, Calendar, CheckCircle2 } from "lucide-react";
+import {
+  User,
+  Users,
+  AlertTriangle,
+  ExternalLink,
+  Calendar,
+  CheckCircle2,
+  GraduationCap,
+  Layers,
+  Tag,
+  Plus,
+  X,
+  Bookmark,
+} from "lucide-react";
 import { CRMContext } from "../layout/RootShell";
 
 interface AddPersonModalProps {
@@ -10,6 +23,18 @@ interface AddPersonModalProps {
   onClose: () => void;
   onPersonAdded: () => void;
 }
+
+const SUGGESTED_LABELS = [
+  "Sunday Feast",
+  "Youth",
+  "Life Patron",
+  "Donor",
+  "Festival Guest",
+  "Bhakti Vriksha",
+  "Volunteer",
+  "Book Reader",
+  "Counselor Student",
+];
 
 export const AddPersonModal: React.FC<AddPersonModalProps> = ({
   isOpen,
@@ -37,6 +62,15 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
   const [stage, setStage] = useState("New Member");
   const [assignedVolunteerId, setAssignedVolunteerId] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Course & Batch enrollment options
+  const [coursesList, setCoursesList] = useState<any[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+  const [selectedBatchId, setSelectedBatchId] = useState<string>("");
+
+  // Google Contacts style Labels
+  const [labels, setLabels] = useState<string[]>([]);
+  const [newLabelInput, setNewLabelInput] = useState<string>("");
 
   // Family specific fields
   const [familyMembersCount, setFamilyMembersCount] = useState(2);
@@ -113,8 +147,31 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
           }
         })
         .catch(console.error);
+
+      // Load active courses for batch enrollment option
+      fetch("/api/courses")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setCoursesList(data);
+          }
+        })
+        .catch(console.error);
     }
   }, [isOpen]);
+
+  const handleAddLabel = (labelToAdd?: string) => {
+    const val = (labelToAdd || newLabelInput).trim();
+    if (!val) return;
+    if (!labels.includes(val)) {
+      setLabels((prev) => [...prev, val]);
+    }
+    setNewLabelInput("");
+  };
+
+  const handleRemoveLabel = (labelToRemove: string) => {
+    setLabels((prev) => prev.filter((l) => l !== labelToRemove));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,6 +189,9 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
         ? `[Family Registration - ${familyMembersCount} Members: ${familyDetails}] ${notes}`.trim()
         : (referredBy ? `[Referred By: ${referredBy}] ${notes}`.trim() : notes);
 
+      const allTags = memberType === "family" ? ["Family", gender, ...labels] : [gender, ...labels];
+      const uniqueTags = Array.from(new Set(allTags.filter(Boolean))).join(", ");
+
       const res = await fetch("/api/people", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -147,7 +207,9 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
           stage,
           assignedVolunteerId: assignedVolunteerId || null,
           notes: combinedNotes,
-          tags: memberType === "family" ? "Family, " + gender : gender,
+          tags: uniqueTags,
+          courseId: selectedCourseId || undefined,
+          batchId: selectedBatchId || undefined,
         }),
       });
 
@@ -165,6 +227,10 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
       setEmail("");
       setNotes("");
       setDob("");
+      setSelectedCourseId("");
+      setSelectedBatchId("");
+      setLabels([]);
+      setNewLabelInput("");
       setExistingPerson(null);
     } catch (err: any) {
       setError(err.message);
@@ -180,8 +246,23 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
       title="Add New Member"
       subtitle="Register new devotee or seeker into central CRM database"
       maxWidth="2xl"
+      headerAction={
+        <button
+          type="button"
+          onClick={() => {
+            const form = document.getElementById("add-member-form") as HTMLFormElement;
+            if (form) form.requestSubmit();
+          }}
+          disabled={saving}
+          className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#08415C] hover:bg-[#063349] text-white rounded-xl text-xs font-bold shadow-gold disabled:opacity-60 transition flex items-center gap-1.5 flex-shrink-0"
+          title="Save Member immediately"
+        >
+          <CheckCircle2 className="w-4 h-4 text-[#D4AF37]" />
+          <span>{saving ? "Saving..." : "Save Member"}</span>
+        </button>
+      }
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form id="add-member-form" onSubmit={handleSubmit} className="space-y-4">
         {/* Step 1: Who are we adding? */}
         <div className="bg-[#FAF8F5] p-3.5 rounded-2xl border border-[#E5D8B8]">
           <label className="block text-xs font-bold text-[#08415C] uppercase tracking-wider mb-2">
@@ -483,6 +564,147 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
                 <option value="Connected">Connected</option>
                 <option value="Inactive">Inactive</option>
               </select>
+            </div>
+          </div>
+
+          {/* Course & Batch Enrollment (Admin requirement) */}
+          <div className="bg-[#FAF8F5] p-3.5 rounded-2xl border border-[#E5D8B8]">
+            <div className="flex items-center gap-2 mb-2">
+              <GraduationCap className="w-4 h-4 text-[#08415C]" />
+              <label className="text-xs font-bold text-[#08415C] uppercase tracking-wider">
+                Course & Batch Enrollment (Optional)
+              </label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-stone-600 mb-1">
+                  Select Course
+                </label>
+                <select
+                  value={selectedCourseId}
+                  onChange={(e) => {
+                    setSelectedCourseId(e.target.value);
+                    setSelectedBatchId("");
+                  }}
+                  className="w-full text-xs p-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-[#08415C] outline-none bg-white font-medium"
+                >
+                  <option value="">-- No Course (General Seeker) --</option>
+                  {coursesList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-stone-600 mb-1">
+                  Select Batch
+                </label>
+                <select
+                  value={selectedBatchId}
+                  onChange={(e) => setSelectedBatchId(e.target.value)}
+                  disabled={!selectedCourseId}
+                  className="w-full text-xs p-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-[#08415C] outline-none bg-white font-medium disabled:bg-stone-100 disabled:text-stone-400"
+                >
+                  <option value="">
+                    {selectedCourseId ? "-- Choose Batch --" : "-- Select course first --"}
+                  </option>
+                  {coursesList
+                    .find((c) => c.id === selectedCourseId)
+                    ?.batches?.map((b: any) => (
+                      <option key={b.id} value={b.id}>
+                        {b.batchName} {b.scheduleInfo ? `(${b.scheduleInfo})` : ""}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+            {selectedBatchId && (
+              <p className="text-[11px] text-emerald-700 mt-2 flex items-center gap-1 font-medium">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>This member will be automatically enrolled and visible in this batch&apos;s calling roster.</span>
+              </p>
+            )}
+          </div>
+
+          {/* Labels / Tags (Google Contacts style - Admin requirement) */}
+          <div className="bg-white p-3.5 rounded-2xl border border-stone-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-[#00A896]" />
+                <span>Labels (Google Contacts Style)</span>
+              </label>
+              <span className="text-[10px] text-stone-400">Add custom tags or select suggestions</span>
+            </div>
+
+            {/* Active Labels Chips */}
+            {labels.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                {labels.map((lbl) => (
+                  <span
+                    key={lbl}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#FAF5E6] text-[#08415C] border border-[#D4AF37]/60 shadow-2xs"
+                  >
+                    <span>🏷️ {lbl}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveLabel(lbl)}
+                      className="text-stone-400 hover:text-rose-600 transition ml-0.5"
+                      aria-label={`Remove ${lbl}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Input for custom label */}
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="text"
+                value={newLabelInput}
+                onChange={(e) => setNewLabelInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddLabel();
+                  }
+                }}
+                placeholder="Type a new label and press Enter or click Add..."
+                className="flex-1 text-xs p-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-[#08415C] outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => handleAddLabel()}
+                className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold rounded-xl transition flex items-center gap-1 flex-shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Label</span>
+              </button>
+            </div>
+
+            {/* Quick Suggestions Chips */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-1.5">
+              <span className="text-[10px] text-stone-400 font-medium">Suggestions:</span>
+              {SUGGESTED_LABELS.map((sug) => {
+                const isAdded = labels.includes(sug);
+                return (
+                  <button
+                    key={sug}
+                    type="button"
+                    onClick={() => (isAdded ? handleRemoveLabel(sug) : handleAddLabel(sug))}
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border transition ${
+                      isAdded
+                        ? "bg-[#08415C] text-white border-[#08415C]"
+                        : "bg-stone-50 text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-100"
+                    }`}
+                  >
+                    {isAdded ? `✓ ${sug}` : `+ ${sug}`}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

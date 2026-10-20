@@ -153,6 +153,8 @@ export async function POST(request: Request) {
       japaDailyRounds,
       spiritualMentor,
       customData,
+      courseId,
+      batchId,
     } = body;
 
     if (!fullName || !mobile) {
@@ -185,6 +187,38 @@ export async function POST(request: Request) {
         customData: customData ? JSON.stringify(customData) : null,
       },
     });
+
+    // Auto-enroll into Course & Batch if selected during contact creation
+    if (courseId && batchId) {
+      try {
+        await prisma.courseEnrollment.create({
+          data: {
+            personId: person.id,
+            courseId,
+            batchId,
+            status: "ACTIVE",
+            attendancePercent: 0,
+          },
+        });
+
+        const batch = await prisma.courseBatch.findUnique({
+          where: { id: batchId },
+          include: { course: { select: { title: true } } },
+        });
+
+        await prisma.timelineEvent.create({
+          data: {
+            personId: person.id,
+            eventType: "COURSE_ENROLL",
+            title: `Enrolled in ${batch?.course.title || "Course"} (${batch?.batchName || "Batch"})`,
+            description: `Directly enrolled upon contact creation.`,
+            createdByUserId: currentUser?.id,
+          },
+        });
+      } catch (enrollErr) {
+        console.error("Error auto-enrolling devotee in batch:", enrollErr);
+      }
+    }
 
     await prisma.timelineEvent.create({
       data: {
