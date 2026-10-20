@@ -15,6 +15,7 @@ import {
   AlertCircle,
   HeartHandshake,
   UserCheck,
+  UserX,
   CheckSquare,
   Phone,
   Eye,
@@ -31,7 +32,7 @@ export default function CallingSewaPage() {
   const { user, hasPermission } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"calling" | "calls_done" | "relationship" | "followups">("calling");
-  const [toCallFilter, setToCallFilter] = useState<"ALL" | "PENDING" | "COMPLETED">("ALL");
+  const [toCallFilter, setToCallFilter] = useState<"ALL" | "ASSIGNED" | "UNASSIGNED" | "PENDING" | "COMPLETED">("ALL");
   const [people, setPeople] = useState<any[]>([]);
   const [callLogs, setCallLogs] = useState<any[]>([]);
   const [followups, setFollowups] = useState<any[]>([]);
@@ -210,13 +211,19 @@ export default function CallingSewaPage() {
 
   // Filtered devotees for To Call list
   const filteredPeople = people.filter((person) => {
+    const isAssigned = !!person.assignedVolunteerId || !!person.assignedVolunteer;
     const latestCall = getLatestCallForPerson(person);
     const isCompleted = !!latestCall;
+
+    if (toCallFilter === "ASSIGNED") return isAssigned;
+    if (toCallFilter === "UNASSIGNED") return !isAssigned;
     if (toCallFilter === "PENDING") return !isCompleted;
     if (toCallFilter === "COMPLETED") return isCompleted;
     return true;
   });
 
+  const assignedCount = people.filter((p) => !!p.assignedVolunteerId || !!p.assignedVolunteer).length;
+  const unassignedCount = people.length - assignedCount;
   const completedCallsCount = people.filter((p) => !!getLatestCallForPerson(p)).length;
   const pendingCallsCount = people.length - completedCallsCount;
 
@@ -633,8 +640,8 @@ export default function CallingSewaPage() {
               </span>
             </div>
 
-            {/* Quick Status Sub-filters: All | Pending To Call | Completed Calls */}
-            <div className="flex items-center gap-1.5 bg-[#FAF8F5] p-1 rounded-xl border border-[#E5D8B8]">
+            {/* Quick Status Sub-filters: All | Assigned | Unassigned | To Call | Completed Calls */}
+            <div className="flex items-center gap-1.5 bg-[#FAF8F5] p-1 rounded-xl border border-[#E5D8B8] flex-wrap">
               <button
                 type="button"
                 onClick={() => setToCallFilter("ALL")}
@@ -649,11 +656,41 @@ export default function CallingSewaPage() {
 
               <button
                 type="button"
+                onClick={() => setToCallFilter("ASSIGNED")}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
+                  toCallFilter === "ASSIGNED"
+                    ? "bg-[#00A896] text-white shadow-xs"
+                    : "text-[#007F70] hover:bg-white"
+                }`}
+                title="Contacts assigned to a caller"
+              >
+                <UserCheck className="w-3 h-3" />
+                <span>Assigned</span>
+                <span className="font-mono text-[10px]">({assignedCount})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setToCallFilter("UNASSIGNED")}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
+                  toCallFilter === "UNASSIGNED"
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "text-amber-800 hover:bg-white"
+                }`}
+                title="Contacts waiting to be assigned to a caller"
+              >
+                <UserX className="w-3 h-3" />
+                <span>Unassigned</span>
+                <span className="font-mono text-[10px]">({unassignedCount})</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setToCallFilter("PENDING")}
                 className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
                   toCallFilter === "PENDING"
-                    ? "bg-amber-600 text-white shadow-xs"
-                    : "text-amber-800 hover:bg-white"
+                    ? "bg-[#08415C] text-white shadow-xs"
+                    : "text-stone-600 hover:bg-white"
                 }`}
                 title="Devotees waiting for call"
               >
@@ -666,8 +703,8 @@ export default function CallingSewaPage() {
                 onClick={() => setToCallFilter("COMPLETED")}
                 className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
                   toCallFilter === "COMPLETED"
-                    ? "bg-[#00A896] text-white shadow-xs"
-                    : "text-[#00A896] hover:bg-white"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "text-emerald-700 hover:bg-white"
                 }`}
                 title="Devotees where call has been completed"
               >
@@ -689,6 +726,10 @@ export default function CallingSewaPage() {
                 <p className="font-semibold text-stone-700">
                   {toCallFilter === "PENDING"
                     ? "Wonderful! All assigned devotees have been called."
+                    : toCallFilter === "UNASSIGNED"
+                    ? "Great! All devotees are currently assigned to callers."
+                    : toCallFilter === "ASSIGNED"
+                    ? "No assigned devotees found in this queue."
                     : "No devotees found in this queue."}
                 </p>
                 {toCallFilter !== "ALL" && (
@@ -708,6 +749,7 @@ export default function CallingSewaPage() {
                 const outcomeConfig = isCompleted
                   ? getOutcomeConfig(latestCall.outcome)
                   : null;
+                const isAssigned = !!person.assignedVolunteerId || !!person.assignedVolunteer;
 
                 return (
                   <div
@@ -727,7 +769,9 @@ export default function CallingSewaPage() {
                               ? "ring-blue-300/60"
                               : "ring-emerald-300/50"
                           }`
-                        : "bg-white border-[#E5D8B8] hover:border-[#D4AF37]"
+                        : isAssigned
+                        ? "bg-[#F0FDF9] border-[#00A896]/50 border-l-4 border-l-[#00A896] hover:border-[#00A896] shadow-2xs"
+                        : "bg-[#FFFDF5] border-amber-300 border-l-4 border-l-amber-400 hover:border-amber-400 shadow-2xs"
                     }`}
                   >
                     {/* Bulk Selection Checkbox */}
@@ -769,6 +813,19 @@ export default function CallingSewaPage() {
                           </span>
                         )}
 
+                        {/* Assigned vs Unassigned Visual Badge */}
+                        {isAssigned ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1" title={`Assigned to ${person.assignedVolunteer?.name || "Caller"}`}>
+                            <UserCheck className="w-2.5 h-2.5 text-emerald-700" />
+                            <span>Assigned</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 animate-pulse" title="Devotee not yet assigned to any caller">
+                            <UserX className="w-2.5 h-2.5 text-amber-700" />
+                            <span>Unassigned</span>
+                          </span>
+                        )}
+
                         <Badge variant="morpankh" size="sm">{person.stage}</Badge>
                         <span className="text-xs font-mono text-stone-600 font-semibold">
                           +91 {person.mobile}
@@ -805,8 +862,17 @@ export default function CallingSewaPage() {
 
                       {/* Caller Assignment, Last Call Time, and Remarks */}
                       <div className="text-[11px] text-stone-600 mt-1.5 flex items-center gap-3 flex-wrap">
-                        <span>
-                          Caller: <strong>{person.assignedVolunteer?.name || "Unassigned"}</strong>
+                        <span className="flex items-center gap-1">
+                          Caller:{" "}
+                          {person.assignedVolunteer?.name ? (
+                            <strong className="text-[#007F70] bg-[#E6F7F4] px-1.5 py-0.5 rounded border border-[#00A896]/30">
+                              {person.assignedVolunteer.name}
+                            </strong>
+                          ) : (
+                            <strong className="text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 italic">
+                              Unassigned (Needs Caller)
+                            </strong>
+                          )}
                         </span>
 
                         {isCompleted && latestCall?.createdAt && (
@@ -886,7 +952,7 @@ export default function CallingSewaPage() {
                       {/* Call Action Button */}
                       <button
                         onClick={() => openCallModal(person)}
-                        className={`flex-1 sm:flex-initial px-3 py-2 sm:py-1.5 text-white text-xs font-semibold rounded-xl sm:rounded-lg shadow-xs flex items-center justify-center gap-1.5 transition ${
+                        className={`flex-1 sm:flex-initial px-2.5 py-1.5 text-white text-xs font-semibold rounded-lg shadow-xs flex items-center justify-center gap-1 transition ${
                           isCompleted
                             ? "bg-[#08415C] hover:bg-[#0B4F6C] border border-[#D4AF37]/40"
                             : "bg-[#00A896] hover:bg-[#028090]"
@@ -894,12 +960,12 @@ export default function CallingSewaPage() {
                         title={isCompleted ? "Call Again / Update Response" : "Click to Dial Devotee"}
                       >
                         <PhoneCall className="w-3.5 h-3.5" />
-                        <span>{isCompleted ? "Update Call" : "Call"}</span>
+                        <span>{isCompleted ? "Update" : "Call"}</span>
                       </button>
 
                       <button
                         onClick={() => openWhatsAppModal(person)}
-                        className="flex-1 sm:flex-initial px-3 py-2 sm:py-1.5 bg-[#08415C] hover:bg-[#0B4F6C] text-white text-xs font-semibold rounded-xl sm:rounded-lg border border-[#D4AF37]/50 shadow-xs flex items-center justify-center gap-1.5 transition"
+                        className="flex-1 sm:flex-initial px-2.5 py-1.5 bg-[#08415C] hover:bg-[#0B4F6C] text-white text-xs font-semibold rounded-lg border border-[#D4AF37]/50 shadow-xs flex items-center justify-center gap-1 transition"
                         title="Send WhatsApp"
                       >
                         <MessageSquare className="w-3.5 h-3.5 text-[#D4AF37]" />

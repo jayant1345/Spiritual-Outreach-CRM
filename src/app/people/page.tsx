@@ -355,6 +355,7 @@ export default function PeoplePage() {
               className="w-full px-3 py-1.5 bg-white border border-[#E5D8B8] rounded-xl text-xs text-[#0B192C] focus:outline-none focus:border-[#08415C]"
             >
               <option value="ALL">All Assigned Callers</option>
+              <option value="UNASSIGNED">⚠️ Unassigned (No Caller)</option>
               {volunteers.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name}

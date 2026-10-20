@@ -42,7 +42,11 @@ export async function GET(request: Request) {
         where.relationshipVolunteerId = currentUser.id;
       }
     } else if (volunteerId && volunteerId !== "ALL") {
-      where.assignedVolunteerId = volunteerId;
+      if (volunteerId === "UNASSIGNED") {
+        where.assignedVolunteerId = null;
+      } else {
+        where.assignedVolunteerId = volunteerId;
+      }
     }
 
     if (query) {
