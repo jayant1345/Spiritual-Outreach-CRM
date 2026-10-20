@@ -26,8 +26,11 @@ import {
   Plus,
   User,
   X,
+  Layers,
+  ArrowRight,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 interface SidebarProps {
   onOpenAddPerson?: () => void;
@@ -49,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isCollapsed = collapsed !== undefined ? collapsed : internalCollapsed;
   const toggleCollapse = onToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
   const { user, isCoordinator, isAdmin, isCallingVolunteer, isRelationshipVolunteer } = useAuth();
+  const { activeCourseTitle, activeBatchSummary } = useWorkspace();
 
   const getNavGroups = () => {
     if (isCallingVolunteer) {
@@ -172,6 +176,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
+
+        {/* ACTIVE WORKSPACE WIDGET (Accessible in Menu / Drawer) */}
+        {(!isCollapsed || mobileOpen) && (
+          <div className="px-3.5 pt-3 pb-1">
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-white via-[#FAF5E6] to-white border border-[#D4AF37]/80 shadow-xs">
+              <div className="flex items-center justify-between gap-1 mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded-md bg-[#08415C] text-[#D4AF37] flex items-center justify-center flex-shrink-0 shadow-2xs">
+                    <GraduationCap className="w-3 h-3" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#08415C] text-white">
+                    Active Workspace
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-xs font-bold text-[#08415C] leading-snug line-clamp-2" title={activeCourseTitle}>
+                {activeCourseTitle}
+              </div>
+
+              <div className="mt-1 flex items-center gap-1 text-[11px] text-stone-600 font-medium">
+                <Layers className="w-3 h-3 text-[#00A896] flex-shrink-0" />
+                <span className="truncate">{activeBatchSummary}</span>
+              </div>
+
+              <Link
+                href="/select-batch"
+                onClick={onCloseMobile}
+                className="mt-2.5 w-full flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF5E6] border border-[#D4AF37] text-[#08415C] text-xs font-bold transition shadow-2xs"
+              >
+                <span>⚡ Change Course / Batches</span>
+                <ArrowRight className="w-3 h-3 text-[#B8860B]" />
+              </Link>
+            </div>
+          </div>
+        )}
 
         {(!isCollapsed || mobileOpen) && onOpenAddPerson && (isCoordinator || isCallingVolunteer) && (
           <div className="px-4 pt-4 pb-2">

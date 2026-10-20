@@ -104,8 +104,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* ACTIVE WORKSPACE BANNER (Course & Batch Focus Indicator) */}
-      <div className="bg-gradient-to-r from-white via-[#FAF5E6]/60 to-white p-3.5 sm:p-4 rounded-2xl border border-[#D4AF37] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+      {/* ACTIVE WORKSPACE BANNER (Course & Batch Focus Indicator) - Visible on Desktop, Moved to Menu on Mobile to maximize screen space */}
+      <div className="hidden md:flex bg-gradient-to-r from-white via-[#FAF5E6]/60 to-white p-3.5 sm:p-4 rounded-2xl border border-[#D4AF37] shadow-xs flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-start sm:items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#08415C] text-[#D4AF37] flex items-center justify-center flex-shrink-0 shadow-xs">
             <GraduationCap className="w-5 h-5" />
@@ -144,28 +144,34 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Header Banner & Monthly Filter Control */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#B8860B]">
+      {/* Header Banner & Monthly Filter Control - Compact on Mobile */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-[#B8860B]">
             <span>🪷 Sri Sri Radha Govind Seva</span>
             <span>•</span>
             <span>Chandkheda Center</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-serif font-bold text-[#08415C] mt-0.5">
+          <h2 className="text-lg sm:text-2xl font-serif font-bold text-[#08415C] mt-0.5 tracking-tight truncate">
             Devotee Outreach & Relationship Cockpit
           </h2>
+          {/* Subtle mobile active cohort indicator */}
+          <div className="md:hidden flex items-center gap-1.5 text-[11px] text-stone-500 font-medium mt-0.5 truncate">
+            <span className="font-semibold text-[#08415C] truncate">{activeCourseTitle}</span>
+            <span className="text-stone-300">•</span>
+            <span className="text-stone-600 truncate">{activeBatchSummary}</span>
+          </div>
         </div>
 
-        {/* Monthly Filter Selector */}
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-[#E5D8B8] rounded-xl shadow-xs text-xs font-medium w-full sm:w-auto">
-            <Calendar className="w-3.5 h-3.5 text-[#08415C]" />
-            <span className="text-stone-500 hidden sm:inline">Period:</span>
+        {/* Monthly Filter Selector (Compact on mobile) */}
+        <div className="flex items-center self-start sm:self-auto flex-shrink-0">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 bg-white border border-[#E5D8B8] rounded-xl shadow-2xs text-[11px] sm:text-xs font-medium">
+            <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#08415C] flex-shrink-0" />
+            <span className="text-stone-400 hidden sm:inline">Period:</span>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent font-semibold text-[#08415C] outline-none text-xs cursor-pointer flex-1"
+              className="bg-transparent font-semibold text-[#08415C] outline-none text-[11px] sm:text-xs cursor-pointer"
             >
               {monthOptions.map((m) => (
                 <option key={m.value} value={m.value}>
@@ -177,29 +183,29 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* STEP 4 PRD: 6 SPECIFIC METRIC KPI CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3.5">
+      {/* STEP 4 PRD: 6 SPECIFIC METRIC KPI CARDS - Compact & Simple on Mobile */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3.5">
         {/* Metric 1: Total Contacts */}
         <Link
           href="/people"
-          className="gold-card p-3 sm:p-3.5 hover:border-[#08415C] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#08415C]"
+          className="gold-card p-2 sm:p-3.5 hover:border-[#08415C] transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-[#08415C]"
           title="Total Contacts in workspace"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
               Total Contacts
             </span>
-            <div className="w-6 h-6 rounded-lg bg-[#08415C]/10 text-[#08415C] flex items-center justify-center flex-shrink-0">
-              <Users className="w-3 h-3" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-[#08415C]/10 text-[#08415C] flex items-center justify-center flex-shrink-0">
+              <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             </div>
           </div>
-          <div className="my-1.5">
-            <div className="text-xl sm:text-2xl font-serif font-bold text-[#08415C]">
+          <div className="my-0.5 sm:my-1.5">
+            <div className="text-lg sm:text-2xl font-serif font-bold text-[#08415C]">
               {currentStats.totalContacts ?? currentStats.totalPeople ?? 0}
             </div>
-            <div className="text-[10px] text-stone-500">In this workspace</div>
+            <div className="text-[10px] text-stone-500 hidden sm:block">In this workspace</div>
           </div>
-          <div className="text-[10px] text-[#08415C] font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+          <div className="text-[10px] text-[#08415C] font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
             <span>View contacts</span>
             <ArrowRight className="w-2.5 h-2.5" />
           </div>
@@ -208,24 +214,24 @@ export default function DashboardPage() {
         {/* Metric 2: Total Assigned Contacts */}
         <Link
           href="/calling-sewa"
-          className="gold-card p-3 sm:p-3.5 hover:border-[#00A896] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#00A896]"
+          className="gold-card p-2 sm:p-3.5 hover:border-[#00A896] transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-[#00A896]"
           title="Contacts assigned to volunteers"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
               Assigned
             </span>
-            <div className="w-6 h-6 rounded-lg bg-emerald-50 text-[#00A896] flex items-center justify-center flex-shrink-0">
-              <UserCheck className="w-3 h-3" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-emerald-50 text-[#00A896] flex items-center justify-center flex-shrink-0">
+              <UserCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             </div>
           </div>
-          <div className="my-1.5">
-            <div className="text-xl sm:text-2xl font-serif font-bold text-[#00A896]">
+          <div className="my-0.5 sm:my-1.5">
+            <div className="text-lg sm:text-2xl font-serif font-bold text-[#00A896]">
               {currentStats.totalAssignedContacts || 0}
             </div>
-            <div className="text-[10px] text-stone-500">Allocated callers</div>
+            <div className="text-[10px] text-stone-500 hidden sm:block">Allocated callers</div>
           </div>
-          <div className="text-[10px] text-[#00A896] font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+          <div className="text-[10px] text-[#00A896] font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
             <span>Assign calls</span>
             <ArrowRight className="w-2.5 h-2.5" />
           </div>
@@ -234,24 +240,24 @@ export default function DashboardPage() {
         {/* Metric 3: Total Pending Calls */}
         <Link
           href="/calling-sewa"
-          className="gold-card p-3 sm:p-3.5 hover:border-[#D4AF37] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#D4AF37]"
+          className="gold-card p-2 sm:p-3.5 hover:border-[#D4AF37] transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-[#D4AF37]"
           title="Total pending follow-up calls"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
               Pending Calls
             </span>
-            <div className="w-6 h-6 rounded-lg bg-[#FAF5E6] text-[#B8860B] flex items-center justify-center flex-shrink-0">
-              <PhoneCall className="w-3 h-3" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-[#FAF5E6] text-[#B8860B] flex items-center justify-center flex-shrink-0">
+              <PhoneCall className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             </div>
           </div>
-          <div className="my-1.5">
-            <div className="text-xl sm:text-2xl font-serif font-bold text-[#08415C]">
+          <div className="my-0.5 sm:my-1.5">
+            <div className="text-lg sm:text-2xl font-serif font-bold text-[#08415C]">
               {currentStats.totalPendingCalls ?? currentStats.callsPending ?? 0}
             </div>
-            <div className="text-[10px] text-stone-500">Calls due</div>
+            <div className="text-[10px] text-stone-500 hidden sm:block">Calls due</div>
           </div>
-          <div className="text-[10px] text-[#B8860B] font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+          <div className="text-[10px] text-[#B8860B] font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
             <span>Calling desk</span>
             <ArrowRight className="w-2.5 h-2.5" />
           </div>
@@ -260,24 +266,24 @@ export default function DashboardPage() {
         {/* Metric 4: Today's Follow-ups */}
         <Link
           href="/todays-work"
-          className="gold-card p-3 sm:p-3.5 hover:border-indigo-600 transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-indigo-600"
+          className="gold-card p-2 sm:p-3.5 hover:border-indigo-600 transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-indigo-600"
           title="Follow-ups due today"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
               Today's Calls
             </span>
-            <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center flex-shrink-0">
-              <CheckSquare className="w-3 h-3" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center flex-shrink-0">
+              <CheckSquare className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             </div>
           </div>
-          <div className="my-1.5">
-            <div className="text-xl sm:text-2xl font-serif font-bold text-indigo-900">
+          <div className="my-0.5 sm:my-1.5">
+            <div className="text-lg sm:text-2xl font-serif font-bold text-indigo-900">
               {currentStats.todayFollowups || 0}
             </div>
-            <div className="text-[10px] text-stone-500">Due today</div>
+            <div className="text-[10px] text-stone-500 hidden sm:block">Due today</div>
           </div>
-          <div className="text-[10px] text-indigo-700 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+          <div className="text-[10px] text-indigo-700 font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
             <span>Today's work</span>
             <ArrowRight className="w-2.5 h-2.5" />
           </div>
@@ -286,24 +292,24 @@ export default function DashboardPage() {
         {/* Metric 5: Interested Devotees */}
         <Link
           href="/people?filter=interested"
-          className="gold-card p-3 sm:p-3.5 hover:border-amber-600 transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-amber-500"
+          className="gold-card p-2 sm:p-3.5 hover:border-amber-600 transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-amber-500"
           title="Interested Devotees"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
               Interested
             </span>
-            <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
-              <Sparkles className="w-3 h-3" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             </div>
           </div>
-          <div className="my-1.5">
-            <div className="text-xl sm:text-2xl font-serif font-bold text-amber-700">
+          <div className="my-0.5 sm:my-1.5">
+            <div className="text-lg sm:text-2xl font-serif font-bold text-amber-700">
               {currentStats.interestedDevotees || 0}
             </div>
-            <div className="text-[10px] text-stone-500">Positive responses</div>
+            <div className="text-[10px] text-stone-500 hidden sm:block">Positive responses</div>
           </div>
-          <div className="text-[10px] text-amber-700 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+          <div className="text-[10px] text-amber-700 font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
             <span>View seekers</span>
             <ArrowRight className="w-2.5 h-2.5" />
           </div>
@@ -312,24 +318,24 @@ export default function DashboardPage() {
         {/* Metric 6: Registered Devotees */}
         <Link
           href="/courses"
-          className="gold-card p-3 sm:p-3.5 hover:border-[#08415C] transition flex flex-col justify-between group shadow-xs cursor-pointer border-t-3 border-t-[#08415C]"
+          className="gold-card p-2 sm:p-3.5 hover:border-[#08415C] transition flex flex-col justify-between group shadow-2xs sm:shadow-xs cursor-pointer border-t-2 sm:border-t-3 border-t-[#08415C]"
           title="Registered Devotees in course"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-[11px] font-semibold text-[#78909C] uppercase tracking-wider truncate">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#78909C] uppercase tracking-wider truncate">
               Registered
             </span>
-            <div className="w-6 h-6 rounded-lg bg-[#08415C]/10 text-[#08415C] flex items-center justify-center flex-shrink-0">
-              <GraduationCap className="w-3 h-3" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-[#08415C]/10 text-[#08415C] flex items-center justify-center flex-shrink-0">
+              <GraduationCap className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             </div>
           </div>
-          <div className="my-1.5">
-            <div className="text-xl sm:text-2xl font-serif font-bold text-[#08415C]">
+          <div className="my-0.5 sm:my-1.5">
+            <div className="text-lg sm:text-2xl font-serif font-bold text-[#08415C]">
               {currentStats.registeredDevotees || 0}
             </div>
-            <div className="text-[10px] text-stone-500">Enrolled devotees</div>
+            <div className="text-[10px] text-stone-500 hidden sm:block">Enrolled devotees</div>
           </div>
-          <div className="text-[10px] text-[#08415C] font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+          <div className="text-[10px] text-[#08415C] font-semibold hidden sm:flex items-center gap-1 group-hover:translate-x-1 transition-transform">
             <span>Course roster</span>
             <ArrowRight className="w-2.5 h-2.5" />
           </div>
