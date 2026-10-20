@@ -265,3 +265,42 @@ export function hasPermission(
   const perms = getEffectivePermissions(user.role, user.privileges);
   return perms.includes(permission);
 }
+
+/**
+ * Extracts batch IDs that this user has specific sewa / view rights to.
+ * Format in privileges array: "batch:<batchId>"
+ */
+export function getUserAssignedBatchIds(
+  user: { role?: string | null; privileges?: string[] | null } | null | undefined
+): string[] {
+  if (!user || !user.privileges || !Array.isArray(user.privileges)) return [];
+  return user.privileges
+    .filter((p) => typeof p === "string" && p.startsWith("batch:"))
+    .map((p) => p.replace("batch:", "").trim())
+    .filter(Boolean);
+}
+
+/**
+ * Checks whether user has permission to view or manage a specific batch.
+ * Super Admins, Admins, and Coordinators have unrestricted access unless restricted.
+ * Volunteers with assigned batches can only access their permitted batches.
+ */
+export function userHasBatchAccess(
+  user: { role?: string | null; privileges?: string[] | null } | null | undefined,
+  batchId: string
+): boolean {
+  if (!user || !user.role) return false;
+  if (user.role === "SUPER_ADMIN" || user.role === "ADMIN") return true;
+
+  const assignedBatchIds = getUserAssignedBatchIds(user);
+  if (assignedBatchIds.length > 0) {
+    return assignedBatchIds.includes(batchId);
+  }
+
+  // If user is coordinator with manage rights and no explicit restriction
+  if (hasPermission(user, "courses:manage")) return true;
+
+  // Otherwise unassigned volunteer has no access if batch restrictions are active
+  return true;
+}
+

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { hasPermission, getUserAssignedBatchIds } from "@/lib/permissions";
 
 export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser(request);
     const { searchParams } = new URL(request.url);
     const volunteerId = searchParams.get("volunteerId");
     const personId = searchParams.get("personId");
@@ -19,6 +21,19 @@ export async function GET(request: Request) {
     }
     if (outcome && outcome !== "ALL") {
       where.outcome = outcome;
+    }
+
+    // Restrict calls to assigned batch devotees if volunteer has batch restrictions
+    const canViewAll = currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "COORDINATOR" || hasPermission(currentUser, "reports:view");
+    const userBatchIds = getUserAssignedBatchIds(currentUser);
+    if (!canViewAll && userBatchIds.length > 0) {
+      where.person = {
+        courseEnrollments: {
+          some: {
+            batchId: { in: userBatchIds },
+          },
+        },
+      };
     }
 
     const calls = await prisma.callLog.findMany({

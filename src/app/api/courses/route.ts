@@ -1,10 +1,56 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermission, getUserAssignedBatchIds } from "@/lib/permissions";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser(request);
+    const userBatchIds = getUserAssignedBatchIds(currentUser);
+    const isRestrictedVolunteer =
+      currentUser &&
+      !hasPermission(currentUser, "courses:manage") &&
+      userBatchIds.length > 0;
+
+    // Load batch volunteer assignments from privileges
+    const usersWithBatches = await prisma.user.findMany({
+      where: {
+        active: true,
+        privileges: { contains: "batch:" },
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        role: true,
+        privileges: true,
+      },
+    });
+
+    const batchVolunteersMap: Record<string, any[]> = {};
+    for (const u of usersWithBatches) {
+      let privs: string[] = [];
+      try {
+        if (u.privileges) privs = JSON.parse(u.privileges);
+      } catch {
+        privs = [];
+      }
+      if (Array.isArray(privs)) {
+        for (const p of privs) {
+          if (typeof p === "string" && p.startsWith("batch:")) {
+            const bId = p.replace("batch:", "").trim();
+            if (!batchVolunteersMap[bId]) batchVolunteersMap[bId] = [];
+            batchVolunteersMap[bId].push({
+              id: u.id,
+              name: u.name,
+              phone: u.phone,
+              role: u.role,
+            });
+          }
+        }
+      }
+    }
+
     const courses = await prisma.course.findMany({
       orderBy: { startDate: "desc" },
       include: {
@@ -23,29 +69,43 @@ export async function GET() {
       },
     });
 
-    const enriched = courses.map((course) => {
-      let totalStudents = 0;
-      let regularCount = 0;
-      let irregularCount = 0;
-      let lowCount = 0;
+    const enriched = courses
+      .map((course) => {
+        // Attach assigned volunteers to each batch
+        let batches = course.batches.map((b) => ({
+          ...b,
+          assignedVolunteers: batchVolunteersMap[b.id] || [],
+        }));
 
-      course.batches.forEach((b) => {
-        totalStudents += b.enrollments.length;
-        regularCount += b.enrollments.filter((e) => e.status === "REGULAR").length;
-        irregularCount += b.enrollments.filter((e) => e.status === "IRREGULAR").length;
-        lowCount += b.enrollments.filter((e) => e.status === "LOW_ATTENDANCE").length;
-      });
+        // Filter batches for restricted volunteers (Devotees with specific batch sewa rights)
+        if (isRestrictedVolunteer) {
+          batches = batches.filter((b) => userBatchIds.includes(b.id));
+        }
 
-      return {
-        ...course,
-        stats: {
-          totalStudents: totalStudents || 50,
-          regularCount: regularCount || 38,
-          irregularCount: irregularCount || 7,
-          lowCount: lowCount || 3,
-        },
-      };
-    });
+        let totalStudents = 0;
+        let regularCount = 0;
+        let irregularCount = 0;
+        let lowCount = 0;
+
+        batches.forEach((b) => {
+          totalStudents += b.enrollments.length;
+          regularCount += b.enrollments.filter((e) => e.status === "REGULAR").length;
+          irregularCount += b.enrollments.filter((e) => e.status === "IRREGULAR").length;
+          lowCount += b.enrollments.filter((e) => e.status === "LOW_ATTENDANCE").length;
+        });
+
+        return {
+          ...course,
+          batches,
+          stats: {
+            totalStudents: totalStudents || 0,
+            regularCount: regularCount || 0,
+            irregularCount: irregularCount || 0,
+            lowCount: lowCount || 0,
+          },
+        };
+      })
+      .filter((course) => !isRestrictedVolunteer || course.batches.length > 0);
 
     return NextResponse.json(enriched);
   } catch (error: any) {

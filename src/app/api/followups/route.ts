@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { getUserAssignedBatchIds } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,15 +16,24 @@ export async function GET(request: Request) {
     const where: any = {};
     if (status !== "ALL") where.status = status;
 
-    // Strict user isolation:
-    // If volunteerId is specified, filter by it.
-    // If scope === "all" and user is admin/coordinator, allow viewing all.
-    // Otherwise, ALWAYS filter to the logged-in user so Devotee X's tasks NEVER show in Devotee Y's feed!
+    // User isolation with batch coordination support:
     const canViewAll = currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "COORDINATOR";
+    const userBatchIds = getUserAssignedBatchIds(currentUser);
+    const hasBatchRestrictions = !canViewAll && userBatchIds.length > 0;
+
     if (volunteerId && volunteerId !== "ALL") {
       where.volunteerId = volunteerId;
     } else if (canViewAll && (scope === "all" || volunteerId === "ALL")) {
-      // allow viewing all team tasks
+      // allow viewing all team tasks across entire center
+    } else if (hasBatchRestrictions && (scope === "all" || volunteerId === "ALL")) {
+      // allow viewing follow-up tasks of devotees in their assigned batch(es) so assigned sevaks can coordinate
+      where.person = {
+        courseEnrollments: {
+          some: {
+            batchId: { in: userBatchIds },
+          },
+        },
+      };
     } else if (currentUser) {
       where.volunteerId = currentUser.id;
     }

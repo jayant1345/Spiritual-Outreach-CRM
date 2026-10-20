@@ -7,6 +7,7 @@ import Modal from "@/components/common/Modal";
 import BatchBulkImportModal from "@/components/courses/BatchBulkImportModal";
 import EditBatchModal from "@/components/courses/EditBatchModal";
 import EditCourseModal from "@/components/courses/EditCourseModal";
+import AssignBatchVolunteersModal from "@/components/courses/AssignBatchVolunteersModal";
 import {
   GraduationCap,
   Plus,
@@ -28,6 +29,8 @@ import {
   ChevronDown,
   ChevronUp,
   Settings,
+  ShieldCheck,
+  UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -116,6 +119,19 @@ export default function CoursesPage() {
 
   const [selectedCourseForBatch, setSelectedCourseForBatch] = useState<string>("");
   const [selectedBatchForEnroll, setSelectedBatchForEnroll] = useState<string>("");
+  const [selectedBatchForVolunteers, setSelectedBatchForVolunteers] = useState<{
+    id: string;
+    batchName: string;
+    courseTitle?: string;
+  } | null>(null);
+
+  const handleOpenAssignVolunteers = (batch: any, course: any) => {
+    setSelectedBatchForVolunteers({
+      id: batch.id,
+      batchName: batch.batchName,
+      courseTitle: course.title,
+    });
+  };
 
   // Form states
   const [courseForm, setCourseForm] = useState({
@@ -560,6 +576,30 @@ export default function CoursesPage() {
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                               {batch.enrollments?.length || 0} Devotees
                             </span>
+                            {/* Assigned Sevaks Badge */}
+                            {batch.assignedVolunteers && batch.assignedVolunteers.length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAssignVolunteers(batch, course)}
+                                className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition flex items-center gap-1 cursor-pointer"
+                                title={`Assigned Sevaks: ${batch.assignedVolunteers.map((v: any) => v.name).join(", ")}`}
+                              >
+                                <UserCheck className="w-3 h-3 text-indigo-600" />
+                                <span>
+                                  {batch.assignedVolunteers.length} Sevak{batch.assignedVolunteers.length > 1 ? "s" : ""}
+                                </span>
+                              </button>
+                            ) : hasPermission("courses:manage") ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAssignVolunteers(batch, course)}
+                                className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 hover:bg-stone-200 transition flex items-center gap-1 cursor-pointer"
+                                title="No sevaks assigned yet. Click to assign devotees to this batch."
+                              >
+                                <Users className="w-3 h-3 text-stone-400" />
+                                <span>Assign Sevaks</span>
+                              </button>
+                            ) : null}
                             {batch.active === false && (
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-stone-200 text-stone-600">
                                 Inactive
@@ -606,6 +646,23 @@ export default function CoursesPage() {
                             <span>Attendance</span>
                             <ArrowRight className="w-3 h-3" />
                           </Link>
+
+                          {hasPermission("courses:manage") && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAssignVolunteers(batch, course)}
+                              className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 rounded-lg text-[11px] font-bold flex items-center gap-1.5 shadow-2xs transition"
+                              title="Assign Sevaks & Devotees to this Batch (Batch View & Calling Rights)"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Batch Rights</span>
+                              {batch.assignedVolunteers && batch.assignedVolunteers.length > 0 && (
+                                <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] flex items-center justify-center font-bold">
+                                  {batch.assignedVolunteers.length}
+                                </span>
+                              )}
+                            </button>
+                          )}
 
                           {hasPermission("courses:manage") && (
                             <div className="flex items-center gap-1 border-l border-stone-200 pl-1">
@@ -1093,6 +1150,14 @@ export default function CoursesPage() {
         course={courseToEdit}
         onCourseUpdated={() => fetchCourses()}
         onCourseDeleted={() => fetchCourses()}
+      />
+
+      {/* Modal: Batch Sewa Rights & Volunteer Assignment */}
+      <AssignBatchVolunteersModal
+        isOpen={!!selectedBatchForVolunteers}
+        onClose={() => setSelectedBatchForVolunteers(null)}
+        batch={selectedBatchForVolunteers}
+        onAssigned={() => fetchCourses()}
       />
     </div>
   );
