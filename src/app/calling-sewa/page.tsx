@@ -27,6 +27,8 @@ import {
   MapPin,
   X,
   ChevronDown,
+  Share2,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getOutcomeConfig } from "@/components/calling/CallActionModal";
@@ -105,6 +107,72 @@ export default function CallingSewaPage() {
   // Reassignment modal or state
   const [reassigningId, setReassigningId] = useState<string | null>(null);
   const [targetVolunteerId, setTargetVolunteerId] = useState("");
+
+  // WhatsApp Calling Report modal
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportCopied, setReportCopied] = useState(false);
+
+  // Helper to format outcome label into clean short status for WhatsApp report
+  const formatReportOutcome = (outcome?: string) => {
+    if (!outcome) return "Pending / Not Called";
+    switch (outcome) {
+      case "YES_WILL_ATTEND":
+        return "yes";
+      case "NO_WILL_NOT_ATTEND":
+      case "NOT_INTERESTED":
+      case "DO_NOT_CONTACT":
+        return "can't come";
+      case "CALL_NOT_PICKED":
+      case "NO_ANSWER":
+        return "not recieve";
+      case "CONFIRM_LATER":
+      case "CALL_BACK":
+        return "call back later";
+      case "NOT_CONFIRMED":
+      case "MAYBE":
+        return "not confirmed";
+      default:
+        return outcome.toLowerCase().replace(/_/g, " ");
+    }
+  };
+
+  const generateReportText = () => {
+    const listToReport = filteredPeople.length > 0 ? filteredPeople : people;
+    const batchTitle = selectedCampaign !== "ALL" ? selectedCampaign : "Calling Sewa";
+    const callerName = selectedVolunteerObj?.name || user?.name || "Caller";
+    const dateStr = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+
+    let lines = [`*Calling Report - ${batchTitle} (${dateStr})*`];
+    lines.push(`Caller: ${callerName}`);
+    lines.push("");
+
+    let yesCount = 0;
+    let notPickedCount = 0;
+    let noCount = 0;
+    let otherCount = 0;
+
+    listToReport.forEach((p) => {
+      const call = getLatestCallForPerson(p);
+      const outcome = call?.outcome;
+      const statusText = formatReportOutcome(outcome);
+      lines.push(`${p.fullName} : ${statusText}`);
+
+      if (outcome === "YES_WILL_ATTEND") yesCount++;
+      else if (outcome === "CALL_NOT_PICKED" || outcome === "NO_ANSWER") notPickedCount++;
+      else if (outcome === "NO_WILL_NOT_ATTEND" || outcome === "NOT_INTERESTED") noCount++;
+      else if (outcome) otherCount++;
+    });
+
+    lines.push("");
+    lines.push(`*Summary:*`);
+    lines.push(`Total Devotees: ${listToReport.length}`);
+    lines.push(`✅ Yes (Attending): ${yesCount}`);
+    lines.push(`📞 Not Received: ${notPickedCount}`);
+    lines.push(`❌ Can't Come: ${noCount}`);
+    if (otherCount > 0) lines.push(`⏰ Callback / Tentative: ${otherCount}`);
+
+    return lines.join("\n");
+  };
 
   // Initialize filter on mount & respect URL params if provided
   useEffect(() => {
@@ -810,9 +878,9 @@ export default function CallingSewaPage() {
             </div>
           )}
 
-          {/* 2. Sub-bar: Devotees Count + Select All & Sort Dropdown (matches admin screenshot) */}
-          <div className="flex items-center justify-between text-xs text-stone-600 pt-0.5 pb-0.5">
-            <div className="flex items-center gap-2.5">
+          {/* 2. Sub-bar: Devotees Count + Select All, WhatsApp Report & Sort Dropdown */}
+          <div className="flex flex-wrap items-center justify-between text-xs text-stone-600 pt-0.5 pb-0.5 gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <label className="flex items-center gap-2 cursor-pointer font-bold text-stone-800 select-none">
                 <input
                   type="checkbox"
@@ -835,19 +903,36 @@ export default function CallingSewaPage() {
               )}
             </div>
 
-            {/* Sort Dropdown */}
-            <div className="relative flex items-center">
-              <select
-                value={sortOption}
-                onChange={(e) => setSortOption(e.target.value)}
-                className="text-xs font-semibold text-stone-700 bg-white border border-stone-200 rounded-lg pl-2 pr-6 py-1.5 appearance-none cursor-pointer hover:bg-stone-50 outline-none shadow-2xs"
+            <div className="flex items-center gap-2">
+              {/* WhatsApp Calling Report Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setReportCopied(false);
+                  setIsReportModalOpen(true);
+                }}
+                className="px-2.5 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition"
+                title="Send or copy calling completion report to WhatsApp"
               >
-                <option value="name-asc">⇅ Name A-Z</option>
-                <option value="name-desc">⇅ Name Z-A</option>
-                <option value="pending-first">⇅ To Call First</option>
-                <option value="recent">⇅ Recently Added</option>
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2 pointer-events-none" />
+                <Share2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">WhatsApp Calling Report</span>
+                <span className="sm:hidden">Report</span>
+              </button>
+
+              {/* Sort Dropdown */}
+              <div className="relative flex items-center">
+                <select
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value)}
+                  className="text-xs font-semibold text-stone-700 bg-white border border-stone-200 rounded-lg pl-2 pr-6 py-1.5 appearance-none cursor-pointer hover:bg-stone-50 outline-none shadow-2xs"
+                >
+                  <option value="name-asc">⇅ Name A-Z</option>
+                  <option value="name-desc">⇅ Name Z-A</option>
+                  <option value="pending-first">⇅ To Call First</option>
+                  <option value="recent">⇅ Recently Added</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2 pointer-events-none" />
+              </div>
             </div>
           </div>
 
@@ -989,6 +1074,42 @@ export default function CallingSewaPage() {
                               {person.source}
                             </span>
                           )}
+                        {/* Last Attendance Indicator (Admin requirement: show whether they attended last time) */}
+                        {(() => {
+                          const lastAtt = person.sessionAttendances && person.sessionAttendances.length > 0 ? person.sessionAttendances[0] : null;
+                          if (!lastAtt) {
+                            return (
+                              <span
+                                className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-100 text-stone-500 border border-stone-200 flex items-center gap-1 leading-none"
+                                title="No attendance record found for previous sessions"
+                              >
+                                <span>⚪</span>
+                                <span>No prev. attendance</span>
+                              </span>
+                            );
+                          }
+                          const isAttended = lastAtt.status === "PRESENT";
+                          const sessTitle = lastAtt.session ? `S${lastAtt.session.sessionNumber}` : "Last Session";
+                          const dateFormatted = lastAtt.session?.sessionDate
+                            ? new Date(lastAtt.session.sessionDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                            : "";
+
+                          return (
+                            <span
+                              className={`text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 leading-none shadow-2xs ${
+                                isAttended
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                  : "bg-rose-50 text-rose-700 border-rose-200"
+                              }`}
+                              title={`Last Attendance: ${isAttended ? "Present" : "Absent"} at ${sessTitle} (${dateFormatted})`}
+                            >
+                              <span>{isAttended ? "🟢" : "🔴"}</span>
+                              <span>
+                                Last {isAttended ? "Present" : "Absent"}: {sessTitle} {dateFormatted ? `(${dateFormatted})` : ""}
+                              </span>
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       {/* Caller Line */}
@@ -1386,6 +1507,91 @@ export default function CallingSewaPage() {
           fetchData();
         }}
       />
+
+      {/* WhatsApp Calling Report Modal */}
+      {isReportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div
+            className="fixed inset-0"
+            onClick={() => setIsReportModalOpen(false)}
+          />
+          <div className="relative bg-white rounded-2xl max-w-lg w-full p-4 sm:p-5 shadow-2xl border border-stone-200 z-10 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-[#25D366]/20 text-[#25D366] flex items-center justify-center font-bold">
+                  <Share2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-stone-900">
+                    WhatsApp Calling Summary Report
+                  </h3>
+                  <p className="text-[11px] text-stone-500">
+                    Directly send or copy formatted calling summary for group / coordinator
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsReportModalOpen(false)}
+                className="text-stone-400 hover:text-stone-700 p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Formatted Report Preview Box */}
+            <div className="relative">
+              <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                Report Preview (Copy or Send to WhatsApp):
+              </label>
+              <textarea
+                readOnly
+                rows={11}
+                value={generateReportText()}
+                className="w-full p-3 font-mono text-xs bg-stone-50 border border-stone-200 rounded-xl text-stone-800 leading-relaxed focus:outline-none select-all"
+              />
+            </div>
+
+            {/* Actions: Copy to Clipboard & Open WhatsApp */}
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(generateReportText());
+                  setReportCopied(true);
+                  setTimeout(() => setReportCopied(false), 2500);
+                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+                  reportCopied
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                    : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
+                }`}
+              >
+                <span>{reportCopied ? "✓ Copied!" : "📋 Copy Report"}</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsReportModalOpen(false)}
+                  className="px-3.5 py-2 text-stone-600 hover:text-stone-900 text-xs font-bold"
+                >
+                  Close
+                </button>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(generateReportText())}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 fill-current" />
+                  <span>Send to WhatsApp ➔</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

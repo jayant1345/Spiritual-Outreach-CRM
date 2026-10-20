@@ -121,6 +121,23 @@ export async function GET(request: Request) {
             volunteer: { select: { id: true, name: true } },
           },
         },
+        sessionAttendances: {
+          orderBy: { recordedAt: "desc" },
+          take: 3,
+          select: {
+            id: true,
+            status: true,
+            recordedAt: true,
+            session: {
+              select: {
+                id: true,
+                sessionNumber: true,
+                title: true,
+                sessionDate: true,
+              },
+            },
+          },
+        },
       },
     });
 
