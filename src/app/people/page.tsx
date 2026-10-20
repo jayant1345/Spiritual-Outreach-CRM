@@ -487,7 +487,8 @@ export default function PeoplePage() {
       )}
 
       {/* MOBILE CARDS VIEW (md:hidden) – Responsive for phones */}
-      <div className="md:hidden space-y-2.5">
+      {/* MOBILE LIST VIEW (md:hidden) – Compact & Minimized for Mobile */}
+      <div className="md:hidden space-y-1.5">
         <div className="flex items-center justify-between text-xs px-1">
           <label className="flex items-center gap-2 cursor-pointer font-semibold text-stone-700">
             <input
@@ -506,7 +507,7 @@ export default function PeoplePage() {
             <p>Loading members...</p>
           </div>
         ) : people.length === 0 ? (
-          <div className="p-8 text-center text-xs text-stone-500 bg-white rounded-2xl border border-stone-200">
+          <div className="p-8 text-center text-xs text-stone-500 bg-white rounded-xl border border-stone-200">
             No members found matching filter criteria.
           </div>
         ) : (
@@ -515,60 +516,80 @@ export default function PeoplePage() {
             return (
               <div
                 key={person.id}
-                className={`p-3.5 bg-white border rounded-2xl transition space-y-2 shadow-xs ${
+                className={`p-2.5 bg-white border rounded-xl transition shadow-2xs hover:border-[#08415C]/40 ${
                   isSelected ? "border-[#08415C] bg-[#FAF8F5]" : "border-[#E5D8B8]"
                 }`}
               >
+                {/* Row 1: Checkbox, Name, Mobile & Status Badge */}
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-2.5 min-w-0">
+                  <div className="flex items-start gap-2 min-w-0 flex-1">
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => handleToggleSelect(person.id)}
-                      className="mt-1 rounded border-stone-300"
+                      className="mt-0.5 rounded border-stone-300 shrink-0"
                     />
                     <div
                       className="cursor-pointer min-w-0"
                       onClick={() => openPersonModal(person.id)}
                     >
-                      <h4 className="font-serif font-bold text-sm text-[#08415C] truncate">
-                        {person.fullName}
-                      </h4>
-                      <p className="text-xs font-mono text-stone-600 mt-0.5">+91 {person.mobile}</p>
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <h4 className="font-serif font-bold text-sm text-[#08415C] leading-snug hover:underline">
+                          {person.fullName}
+                        </h4>
+                        <span className="text-[11px] font-mono text-stone-500">
+                          +91 {person.mobile}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <Badge variant="morpankh" size="sm">{person.stage}</Badge>
+                  <Badge variant="morpankh" size="sm" className="text-[10px] py-0.5 px-2 shrink-0 leading-tight">
+                    {person.stage}
+                  </Badge>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-stone-500 pt-1 border-t border-stone-100">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-[#D4AF37]" /> {person.area || "Chandkheda"}
-                  </span>
-                  <span>Caller: {person.assignedVolunteer?.name || "Unassigned"}</span>
-                </div>
+                {/* Row 2: Location/Caller on left + Minimized Action Buttons on right */}
+                <div className="flex items-center justify-between gap-1.5 pt-1.5 mt-1 border-t border-stone-100 text-[11px]">
+                  <div className="flex items-center gap-1 text-stone-500 truncate min-w-0">
+                    <MapPin className="w-3 h-3 text-[#D4AF37] shrink-0" />
+                    <span className="truncate">{person.area || "Chandkheda"}</span>
+                    {person.assignedVolunteer?.name && (
+                      <>
+                        <span className="text-stone-300">•</span>
+                        <span className="truncate text-stone-400">
+                          {person.assignedVolunteer.name}
+                        </span>
+                      </>
+                    )}
+                  </div>
 
-                {/* Mobile Quick Action Buttons */}
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    onClick={() => openCallModal(person)}
-                    className="flex-1 py-1.5 bg-[#00A896] text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1"
-                  >
-                    <PhoneCall className="w-3.5 h-3.5" /> Call
-                  </button>
-                  <button
-                    onClick={() => openWhatsAppModal(person)}
-                    className="flex-1 py-1.5 bg-[#08415C] text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 text-[#D4AF37]" /> WhatsApp
-                  </button>
-                  <button
-                    onClick={() => openPersonModal(person.id)}
-                    className="p-1.5 bg-stone-100 border border-stone-200 text-stone-700 rounded-lg"
-                    title="Open 360° Profile"
-                  >
-                    <Eye className="w-4 h-4 text-[#08415C]" />
-                  </button>
+                  {/* Minimized Call & WhatsApp & Profile Buttons */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => openCallModal(person)}
+                      className="px-2 py-0.5 bg-[#00A896] hover:bg-[#008f80] active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 transition shadow-2xs"
+                      title="Call"
+                    >
+                      <PhoneCall className="w-3 h-3" />
+                      <span>Call</span>
+                    </button>
+                    <button
+                      onClick={() => openWhatsAppModal(person)}
+                      className="px-2 py-0.5 bg-[#08415C] hover:bg-[#063349] active:scale-95 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 transition shadow-2xs"
+                      title="WhatsApp"
+                    >
+                      <MessageSquare className="w-3 h-3 text-[#D4AF37]" />
+                      <span>WhatsApp</span>
+                    </button>
+                    <button
+                      onClick={() => openPersonModal(person.id)}
+                      className="p-1 bg-stone-100 hover:bg-stone-200 active:scale-95 border border-stone-200 text-stone-700 rounded-md transition"
+                      title="Open 360° Profile"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-[#08415C]" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
