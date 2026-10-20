@@ -32,10 +32,15 @@ import {
   Trash2,
   Settings,
   MoreVertical,
+  Filter,
+  UserPlus,
+  Phone,
+  SlidersHorizontal,
 } from "lucide-react";
 import EditBatchModal from "@/components/courses/EditBatchModal";
 import EditCourseModal from "@/components/courses/EditCourseModal";
 import Modal from "@/components/common/Modal";
+import { AddPersonModal } from "@/components/people/AddPersonModal";
 
 function CourseAttendanceMatrixInner() {
   const params = useParams();
@@ -58,7 +63,13 @@ function CourseAttendanceMatrixInner() {
   const [isEditBatchOpen, setIsEditBatchOpen] = useState(false);
   const [isEditCourseOpen, setIsEditCourseOpen] = useState(false);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [isAddPersonOpen, setIsAddPersonOpen] = useState(false);
   const [isEditSessionOpen, setIsEditSessionOpen] = useState(false);
+  const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<string[]>([]);
+  const [activeActionDropdownId, setActiveActionDropdownId] = useState<string | null>(null);
+  const [globalSearchResults, setGlobalSearchResults] = useState<any[]>([]);
+  const [isSearchingGlobal, setIsSearchingGlobal] = useState(false);
+  const [enrollingPersonId, setEnrollingPersonId] = useState<string | null>(null);
   const [sessionEditForm, setSessionEditForm] = useState({
     id: "",
     title: "",
@@ -224,6 +235,64 @@ function CourseAttendanceMatrixInner() {
     course?.batches?.[0] || { sessions: [], enrollments: [], batchName: "Main Batch" };
   const sessions = batch?.sessions || [];
   const enrollments = batch?.enrollments || [];
+
+  // Global contacts search debounce when searching
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q || q.length < 2) {
+      setGlobalSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingGlobal(true);
+      try {
+        const res = await fetch(`/api/people?query=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const data = await res.json();
+          // Filter out devotees who are already enrolled in this batch
+          const enrolledPersonIds = new Set((enrollments || []).map((e: any) => e.personId));
+          const notEnrolled = (Array.isArray(data) ? data : data.people || []).filter(
+            (p: any) => !enrolledPersonIds.has(p.id)
+          );
+          setGlobalSearchResults(notEnrolled.slice(0, 5));
+        }
+      } catch (err) {
+        console.error("Error searching global contacts:", err);
+      } finally {
+        setIsSearchingGlobal(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, enrollments]);
+
+  const handleEnrollExistingDevotee = async (personId: string) => {
+    if (!batch?.id) return;
+    setEnrollingPersonId(personId);
+    try {
+      const res = await fetch("/api/courses/enroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          personId,
+          batchId: batch.id,
+        }),
+      });
+      if (res.ok) {
+        setSearchQuery("");
+        setGlobalSearchResults([]);
+        fetchCourseDetails();
+      } else {
+        const d = await res.json();
+        alert(d.error || "Failed to enroll devotee");
+      }
+    } catch (err) {
+      console.error("Error enrolling devotee:", err);
+    } finally {
+      setEnrollingPersonId(null);
+    }
+  };
 
   useEffect(() => {
     if (sessions.length > 0 && !selectedSessionId) {
@@ -706,72 +775,256 @@ function CourseAttendanceMatrixInner() {
             </div>
           </div>
 
-          {/* Quick Search & Filter Controls */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Type name or phone to fast check-in..."
-                className="w-full pl-9 pr-3.5 py-2 bg-white border border-[#E5D8B8] rounded-xl text-xs text-[#0B192C] focus:outline-none focus:border-[#08415C]"
-              />
+          {/* Quick Search & Filter Controls: Highlighted Search Bar & Compact Layout */}
+          <div className="space-y-2">
+            {/* Row 1: Highlighted Search Bar (prominent light blue bg, blue border, subtle shadow) + + New Contact */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-blue-500 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search devotee by name or mobile number..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-blue-50/70 border border-blue-400/80 rounded-xl text-xs sm:text-sm text-[#08415C] placeholder-blue-700/60 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setGlobalSearchResults([]);
+                    }}
+                    className="absolute right-3 top-2.5 text-stone-400 hover:text-stone-700 text-xs font-bold p-1"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* On Desktop: New Contact sits next to Search Bar. On mobile, rendered below with filters or here */}
+              <button
+                type="button"
+                onClick={() => setIsAddPersonOpen(true)}
+                className="hidden sm:inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-[#08415C] hover:bg-[#063349] text-white rounded-xl text-xs font-bold shadow-xs transition whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4 text-white" />
+                <span>+ New Contact</span>
+              </button>
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-              <button
-                type="button"
-                onClick={() => setCheckinFilter("ALL")}
-                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition ${
-                  checkinFilter === "ALL"
-                    ? "bg-[#08415C] text-white shadow-xs"
-                    : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
-                }`}
-              >
-                All ({enrollments.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setCheckinFilter("PENDING_RSVP")}
-                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition ${
-                  checkinFilter === "PENDING_RSVP"
-                    ? "bg-amber-600 text-white shadow-xs"
-                    : "bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100"
-                }`}
-              >
-                📞 Pending RSVPs ({pendingRsvpCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setCheckinFilter("PRESENT")}
-                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition ${
-                  checkinFilter === "PRESENT"
-                    ? "bg-emerald-700 text-white shadow-xs"
-                    : "bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100"
-                }`}
-              >
-                🟢 Present ({presentInSessionCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setCheckinFilter("UNMARKED")}
-                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition ${
-                  checkinFilter === "UNMARKED"
-                    ? "bg-stone-700 text-white shadow-xs"
-                    : "bg-stone-100 border border-stone-200 text-stone-700 hover:bg-stone-200"
-                }`}
-              >
-                ⚪ Unmarked ({enrollments.length - presentInSessionCount})
-              </button>
+            {/* Global Search Results Dropdown/Banner: Enroll devotees from all contacts who are not yet in batch */}
+            {searchQuery.trim().length >= 2 && (
+              <div className="bg-white border border-blue-200 rounded-xl p-3 shadow-md space-y-2 animate-fadeIn">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-[#08415C] flex items-center gap-1.5">
+                    <Search className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Global Contacts Search</span>
+                    {isSearchingGlobal && <span className="text-[10px] text-stone-400 font-normal">(Searching...)</span>}
+                  </span>
+                  <span className="text-[11px] text-stone-500">
+                    Devotees found outside this batch
+                  </span>
+                </div>
+
+                {globalSearchResults.length > 0 ? (
+                  <div className="divide-y divide-stone-100">
+                    {globalSearchResults.map((dev: any) => (
+                      <div
+                        key={dev.id}
+                        className="py-2 flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-bold text-[#08415C] truncate">{dev.fullName}</div>
+                          <div className="text-[11px] text-stone-500">
+                            +91 {dev.mobile} {dev.area ? `• ${dev.area}` : ""}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={enrollingPersonId === dev.id}
+                          onClick={() => handleEnrollExistingDevotee(dev.id)}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 transition shadow-xs disabled:opacity-50 whitespace-nowrap"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{enrollingPersonId === dev.id ? "Adding..." : "Add to Batch"}</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : !isSearchingGlobal ? (
+                  <div className="flex items-center justify-between text-[11px] text-stone-500 py-1">
+                    <span>No other contacts found matching &quot;{searchQuery}&quot;.</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddPersonOpen(true)}
+                      className="text-[#08415C] font-bold underline hover:text-blue-700 ml-2"
+                    >
+                      Create &amp; Add &quot;{searchQuery}&quot; as New Contact
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {/* Row 2: Filter Tabs + Action Options + Mobile "+ New Contact" Button */}
+            <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+              {/* Filter Chips */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs flex-1">
+                <button
+                  type="button"
+                  onClick={() => setCheckinFilter("ALL")}
+                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition text-xs ${
+                    checkinFilter === "ALL"
+                      ? "bg-[#08415C] text-white shadow-xs"
+                      : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
+                  }`}
+                >
+                  All ({enrollments.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCheckinFilter("PENDING_RSVP")}
+                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition text-xs ${
+                    checkinFilter === "PENDING_RSVP"
+                      ? "bg-amber-600 text-white shadow-xs"
+                      : "bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100"
+                  }`}
+                >
+                  📞 Pending RSVPs ({pendingRsvpCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCheckinFilter("PRESENT")}
+                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition text-xs ${
+                    checkinFilter === "PRESENT"
+                      ? "bg-emerald-700 text-white shadow-xs"
+                      : "bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+                  }`}
+                >
+                  🟢 Present ({presentInSessionCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCheckinFilter("UNMARKED")}
+                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition text-xs ${
+                    checkinFilter === "UNMARKED"
+                      ? "bg-stone-700 text-white shadow-xs"
+                      : "bg-stone-100 border border-stone-200 text-stone-700 hover:bg-stone-200"
+                  }`}
+                >
+                  ⚪ Unmarked ({enrollments.length - presentInSessionCount})
+                </button>
+              </div>
+
+              {/* Mobile "+ New Contact" Button & Filter Icons */}
+              <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end sm:justify-start">
+                <button
+                  type="button"
+                  onClick={() => setIsAddPersonOpen(true)}
+                  className="sm:hidden flex-1 py-2 px-3 bg-[#08415C] hover:bg-[#063349] text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5 text-white" />
+                  <span>+ New Contact</span>
+                </button>
+
+                {/* Bulk Select All Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedEnrollmentIds.length === checkinEnrollments.length) {
+                      setSelectedEnrollmentIds([]);
+                    } else {
+                      setSelectedEnrollmentIds(checkinEnrollments.map((e: any) => e.id));
+                    }
+                  }}
+                  className={`p-2 rounded-xl border text-xs font-semibold flex items-center gap-1 transition ${
+                    selectedEnrollmentIds.length > 0 && selectedEnrollmentIds.length === checkinEnrollments.length
+                      ? "bg-[#08415C] text-white border-[#08415C]"
+                      : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
+                  }`}
+                  title={
+                    selectedEnrollmentIds.length === checkinEnrollments.length
+                      ? "Deselect All"
+                      : "Select All for bulk action"
+                  }
+                >
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={
+                      checkinEnrollments.length > 0 &&
+                      selectedEnrollmentIds.length === checkinEnrollments.length
+                    }
+                    className="w-3.5 h-3.5 rounded text-[#08415C] pointer-events-none"
+                  />
+                  <span className="hidden sm:inline text-[11px]">Select All</span>
+                </button>
+              </div>
             </div>
+
+            {/* Bulk Action Bar when items are selected */}
+            {selectedEnrollmentIds.length > 0 && (
+              <div className="p-2.5 bg-[#FAF8F5] border border-[#E5D8B8] rounded-xl flex items-center justify-between gap-2 text-xs animate-fadeIn">
+                <div className="font-bold text-[#08415C]">
+                  {selectedEnrollmentIds.length} Devotee(s) Selected
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!currentSession?.id) return;
+                      for (const enrId of selectedEnrollmentIds) {
+                        const enr = enrollments.find((e: any) => e.id === enrId);
+                        if (enr) {
+                          await fetch("/api/courses/attendance", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              sessionId: currentSession.id,
+                              enrollmentId: enr.id,
+                              personId: enr.person.id,
+                              status: "PRESENT",
+                            }),
+                          });
+                        }
+                      }
+                      setSelectedEnrollmentIds([]);
+                      fetchCourseDetails();
+                    }}
+                    className="px-3 py-1 bg-emerald-700 text-white rounded-lg font-bold shadow-xs hover:bg-emerald-800 transition"
+                  >
+                    Mark Present
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEnrollmentIds([])}
+                    className="px-2.5 py-1 text-stone-600 hover:text-stone-900 font-semibold"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Devotees Fast Check-In Cards List */}
-          <div className="space-y-2.5">
+          {/* Devotees Compact List: Small, easy-to-read rows matching the mockup */}
+          <div className="space-y-1.5">
+            {/* Header row on desktop */}
+            <div className="hidden sm:flex items-center justify-between px-3.5 py-1.5 text-[11px] font-bold text-stone-400 uppercase tracking-wider">
+              <div className="flex items-center gap-3">
+                <span className="w-4"></span>
+                <span>Devotee</span>
+              </div>
+              <div className="flex items-center gap-6 pr-2">
+                <span>Attendance Status</span>
+                <span>Actions</span>
+              </div>
+            </div>
+
             {checkinEnrollments.length === 0 ? (
               <div className="p-8 text-center text-xs text-stone-500 bg-white border border-stone-200 rounded-2xl">
-                No devotees match the selected check-in criteria.
+                No devotees match the selected criteria.
               </div>
             ) : (
               checkinEnrollments.map((enr: any) => {
@@ -782,75 +1035,82 @@ function CourseAttendanceMatrixInner() {
                   (c: any) => c.outcome === "YES_WILL_ATTEND"
                 );
                 const isMarking = markingSessionId === `${currentSession?.id}-${enr.person.id}`;
+                const isSelected = selectedEnrollmentIds.includes(enr.id);
+
+                // Initials for avatar
+                const initials = (enr.person.fullName || "")
+                  .trim()
+                  .split(" ")
+                  .filter(Boolean)
+                  .map((w: string) => w[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase() || "DV";
 
                 return (
                   <div
                     key={enr.id}
-                    className={`p-3.5 rounded-2xl border transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs ${
+                    className={`px-3 py-2.5 rounded-xl border transition flex items-center justify-between gap-2.5 shadow-2xs hover:border-blue-300 ${
                       isPresent
-                        ? "bg-emerald-50/70 border-emerald-300"
+                        ? "bg-emerald-50/40 border-emerald-200"
                         : hasConfirmedCall
-                        ? "bg-amber-50/50 border-amber-300"
-                        : "bg-white border-[#E5D8B8]"
+                        ? "bg-amber-50/30 border-amber-200"
+                        : "bg-white border-stone-200"
                     }`}
                   >
-                    {/* Left Info */}
-                    <div
-                      className="min-w-0 flex-1 cursor-pointer"
-                      onClick={() => openPersonModal(enr.person.id)}
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-serif font-bold text-base text-[#08415C]">
-                          {enr.person.fullName}
-                        </span>
-                        <span className="text-xs font-mono font-semibold text-stone-600">
-                          +91 {enr.person.mobile}
-                        </span>
-                        {enr.person.area && (
-                          <span className="text-[11px] text-stone-500">• {enr.person.area}</span>
-                        )}
-                        {hasConfirmedCall && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-200">
-                            📞 Promised on Call (Said YES)
-                          </span>
-                        )}
-                        {isPresent && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                            ✅ Present &amp; Checked In
-                          </span>
-                        )}
+                    {/* Checkbox + Avatar + Info */}
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {
+                          if (isSelected) {
+                            setSelectedEnrollmentIds(selectedEnrollmentIds.filter((id) => id !== enr.id));
+                          } else {
+                            setSelectedEnrollmentIds([...selectedEnrollmentIds, enr.id]);
+                          }
+                        }}
+                        className="w-4 h-4 rounded text-[#08415C] border-stone-300 cursor-pointer flex-shrink-0"
+                      />
+
+                      {/* Avatar Initials Pill */}
+                      <div
+                        onClick={() => openPersonModal(enr.person.id)}
+                        className="w-8 h-8 rounded-full bg-blue-100 text-blue-900 font-bold text-xs flex items-center justify-center flex-shrink-0 cursor-pointer border border-blue-200"
+                      >
+                        {initials}
                       </div>
-                      <div className="text-[11px] text-stone-500 mt-0.5">
-                        Caller: <strong>{enr.person.assignedVolunteer?.name || "Unassigned"}</strong> • Regularity: {enr.attendancePercent}% ({enr.status})
+
+                      {/* Name + Mobile + Locality */}
+                      <div
+                        className="min-w-0 flex-1 cursor-pointer"
+                        onClick={() => openPersonModal(enr.person.id)}
+                      >
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-xs sm:text-sm text-[#08415C] truncate">
+                            {enr.person.fullName}
+                          </span>
+                          {hasConfirmedCall && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-900 border border-blue-200">
+                              RSVP YES
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-stone-500 font-mono flex items-center gap-1.5 truncate">
+                          <span>+91 {enr.person.mobile}</span>
+                          {enr.person.area && (
+                            <>
+                              <span className="text-stone-300">•</span>
+                              <span className="font-sans text-stone-600 truncate">{enr.person.area}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-                      {/* If Pending RSVP, offer quick call and whatsapp */}
-                      {hasConfirmedCall && !isPresent && (
-                        <>
-                          <a
-                            href={`tel:${enr.person.mobile}`}
-                            className="px-2.5 py-1.5 bg-white hover:bg-stone-50 border border-stone-200 text-[#08415C] rounded-xl text-xs font-bold flex items-center gap-1 shadow-xs transition"
-                            title="Call Devotee directly on Phone"
-                          >
-                            <PhoneCall className="w-3.5 h-3.5 text-[#00A896]" />
-                            <span>Call Now</span>
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => openWhatsAppModal(enr.person)}
-                            className="px-2.5 py-1.5 bg-white hover:bg-stone-50 border border-stone-200 text-[#25D366] rounded-xl text-xs font-bold flex items-center gap-1 shadow-xs transition"
-                            title="Send WhatsApp Reminder"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            <span>WhatsApp</span>
-                          </button>
-                        </>
-                      )}
-
-                      {/* 1-Tap Check-In Button */}
+                    {/* Right: Quick Status Toggle + Compact Call + WhatsApp + 3-Dot Menu */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {/* Attendance Status Badge / Quick Toggle */}
                       <button
                         type="button"
                         disabled={isMarking}
@@ -862,26 +1122,96 @@ function CourseAttendanceMatrixInner() {
                             isPresent ? "PRESENT" : "ABSENT"
                           )
                         }
-                        className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm ${
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1 transition ${
                           isPresent
-                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                            : "bg-[#08415C] hover:bg-[#063349] text-white shadow-gold"
+                            ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300"
+                            : "bg-stone-100 text-stone-600 hover:bg-stone-200 border border-stone-200"
                         }`}
+                        title={isPresent ? "Click to Mark Absent" : "Click to Mark Present"}
                       >
-                        {isMarking ? (
-                          <span>Updating...</span>
-                        ) : isPresent ? (
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            isPresent ? "bg-emerald-600" : "bg-stone-400"
+                          }`}
+                        />
+                        <span>{isMarking ? "..." : isPresent ? "Checked In" : "Not Checked In"}</span>
+                      </button>
+
+                      {/* Compact Call Button */}
+                      <a
+                        href={`tel:${enr.person.mobile}`}
+                        className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 transition"
+                        title={`Call ${enr.person.fullName}`}
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                      </a>
+
+                      {/* Compact WhatsApp Button */}
+                      <button
+                        type="button"
+                        onClick={() => openWhatsAppModal(enr.person)}
+                        className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg border border-emerald-200 transition"
+                        title={`Send WhatsApp to ${enr.person.fullName}`}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* 3-Dot More Menu */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveActionDropdownId(
+                              activeActionDropdownId === enr.id ? null : enr.id
+                            )
+                          }
+                          className="p-1.5 hover:bg-stone-100 text-stone-600 rounded-lg transition"
+                          title="More options"
+                        >
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </button>
+
+                        {activeActionDropdownId === enr.id && (
                           <>
-                            <Check className="w-4 h-4 text-emerald-200" />
-                            <span>Checked In (Undo)</span>
-                          </>
-                        ) : (
-                          <>
-                            <Zap className="w-4 h-4 text-[#D4AF37]" />
-                            <span>⚡ 1-Tap Check In</span>
+                            <div
+                              className="fixed inset-0 z-30"
+                              onClick={() => setActiveActionDropdownId(null)}
+                            />
+                            <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-stone-200 rounded-xl shadow-xl py-1 z-40 text-xs animate-fadeIn">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveActionDropdownId(null);
+                                  openPersonModal(enr.person.id);
+                                }}
+                                className="w-full text-left px-3 py-1.5 hover:bg-stone-50 font-medium text-stone-700"
+                              >
+                                👤 View Profile
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveActionDropdownId(null);
+                                  openCallModal(enr.person);
+                                }}
+                                className="w-full text-left px-3 py-1.5 hover:bg-stone-50 font-medium text-stone-700"
+                              >
+                                📞 Log Call Details
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveActionDropdownId(null);
+                                  handleCreateAbsenteeFollowup(enr.person.id, enr.person.fullName);
+                                }}
+                                className="w-full text-left px-3 py-1.5 hover:bg-stone-50 font-medium text-amber-800"
+                              >
+                                📋 Create Follow-up
+                              </button>
+                            </div>
                           </>
                         )}
-                      </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1211,6 +1541,15 @@ function CourseAttendanceMatrixInner() {
         onCourseDeleted={() => {
           window.location.href = "/courses";
         }}
+      />
+
+      {/* Modal: Add New Contact to Course Batch */}
+      <AddPersonModal
+        isOpen={isAddPersonOpen}
+        onClose={() => setIsAddPersonOpen(false)}
+        onPersonAdded={() => fetchCourseDetails()}
+        initialCourseId={courseId}
+        initialBatchId={batch?.id}
       />
     </div>
   );

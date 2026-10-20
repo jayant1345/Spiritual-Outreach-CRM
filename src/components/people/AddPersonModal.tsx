@@ -24,6 +24,8 @@ interface AddPersonModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPersonAdded: () => void;
+  initialCourseId?: string;
+  initialBatchId?: string;
 }
 
 const SUGGESTED_LABELS = [
@@ -42,6 +44,8 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
   isOpen,
   onClose,
   onPersonAdded,
+  initialCourseId,
+  initialBatchId,
 }) => {
   const { openPersonModal } = useContext(CRMContext);
 
@@ -68,8 +72,8 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
 
   // Course & Batch enrollment options
   const [coursesList, setCoursesList] = useState<any[]>([]);
-  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
-  const [selectedBatchId, setSelectedBatchId] = useState<string>("");
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(initialCourseId || "");
+  const [selectedBatchId, setSelectedBatchId] = useState<string>(initialBatchId || "");
 
   // Google Contacts style Labels
   const [labels, setLabels] = useState<string[]>([]);
@@ -160,8 +164,11 @@ export const AddPersonModal: React.FC<AddPersonModalProps> = ({
           }
         })
         .catch(console.error);
+
+      if (initialCourseId) setSelectedCourseId(initialCourseId);
+      if (initialBatchId) setSelectedBatchId(initialBatchId);
     }
-  }, [isOpen]);
+  }, [isOpen, initialCourseId, initialBatchId]);
 
   const handleAddLabel = (labelToAdd?: string) => {
     const val = (labelToAdd || newLabelInput).trim();
