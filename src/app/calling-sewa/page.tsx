@@ -29,10 +29,12 @@ import {
   ChevronDown,
   Share2,
   FileText,
+  UploadCloud,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getOutcomeConfig } from "@/components/calling/CallActionModal";
 import AssignMultipleModal from "@/components/calling/AssignMultipleModal";
+import ImportCallingModal from "@/components/calling/ImportCallingModal";
 
 const AVATAR_PALETTES = [
   { bg: "bg-[#FCE7F3]", text: "text-[#BE185D]" }, // Rose/Pink (like BJ)
@@ -112,6 +114,9 @@ export default function CallingSewaPage() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportCopied, setReportCopied] = useState(false);
 
+  // Import Calling Data modal
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
   // Helper to format outcome label into clean short status for WhatsApp report
   const formatReportOutcome = (outcome?: string) => {
     if (!outcome) return "Pending / Not Called";
@@ -137,9 +142,8 @@ export default function CallingSewaPage() {
   };
 
   const generateReportText = () => {
-    const listToReport = filteredPeople.length > 0 ? filteredPeople : people;
-    const batchTitle = selectedCampaign !== "ALL" ? selectedCampaign : "Calling Sewa";
     const callerName = selectedVolunteerObj?.name || user?.name || "Caller";
+    const batchTitle = selectedCampaign !== "ALL" ? selectedCampaign : "Calling Desk";
     const dateStr = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 
     let lines = [`*Calling Report - ${batchTitle} (${dateStr})*`];
@@ -150,26 +154,52 @@ export default function CallingSewaPage() {
     let notPickedCount = 0;
     let noCount = 0;
     let otherCount = 0;
+    let pendingCount = 0;
 
-    listToReport.forEach((p) => {
-      const call = getLatestCallForPerson(p);
-      const outcome = call?.outcome;
-      const statusText = formatReportOutcome(outcome);
-      lines.push(`${p.fullName} : ${statusText}`);
+    if (activeTab === "calls_done" && callLogs.length > 0) {
+      callLogs.forEach((log) => {
+        const name = log.person?.fullName || "Devotee";
+        const outcome = log.outcome;
+        const statusText = formatReportOutcome(outcome);
+        lines.push(`${name} : ${statusText}`);
 
-      if (outcome === "YES_WILL_ATTEND") yesCount++;
-      else if (outcome === "CALL_NOT_PICKED" || outcome === "NO_ANSWER") notPickedCount++;
-      else if (outcome === "NO_WILL_NOT_ATTEND" || outcome === "NOT_INTERESTED") noCount++;
-      else if (outcome) otherCount++;
-    });
+        if (outcome === "YES_WILL_ATTEND") yesCount++;
+        else if (outcome === "CALL_NOT_PICKED" || outcome === "NO_ANSWER") notPickedCount++;
+        else if (outcome === "NO_WILL_NOT_ATTEND" || outcome === "NOT_INTERESTED") noCount++;
+        else if (outcome) otherCount++;
+      });
 
-    lines.push("");
-    lines.push(`*Summary:*`);
-    lines.push(`Total Devotees: ${listToReport.length}`);
-    lines.push(`✅ Yes (Attending): ${yesCount}`);
-    lines.push(`📞 Not Received: ${notPickedCount}`);
-    lines.push(`❌ Can't Come: ${noCount}`);
-    if (otherCount > 0) lines.push(`⏰ Callback / Tentative: ${otherCount}`);
+      lines.push("");
+      lines.push(`*Summary:*`);
+      lines.push(`Total Calls Done: ${callLogs.length}`);
+      lines.push(`✅ Yes (Attending): ${yesCount}`);
+      lines.push(`📞 Not Received: ${notPickedCount}`);
+      lines.push(`❌ Can't Come: ${noCount}`);
+      if (otherCount > 0) lines.push(`⏰ Callback / Tentative: ${otherCount}`);
+    } else {
+      const targetList = filteredPeople.length > 0 ? filteredPeople : people;
+      targetList.forEach((p) => {
+        const call = getLatestCallForPerson(p);
+        const outcome = call?.outcome;
+        const statusText = formatReportOutcome(outcome);
+        lines.push(`${p.fullName} : ${statusText}`);
+
+        if (outcome === "YES_WILL_ATTEND") yesCount++;
+        else if (outcome === "CALL_NOT_PICKED" || outcome === "NO_ANSWER") notPickedCount++;
+        else if (outcome === "NO_WILL_NOT_ATTEND" || outcome === "NOT_INTERESTED") noCount++;
+        else if (outcome) otherCount++;
+        else pendingCount++;
+      });
+
+      lines.push("");
+      lines.push(`*Summary:*`);
+      lines.push(`Total Devotees: ${targetList.length}`);
+      lines.push(`✅ Yes (Attending): ${yesCount}`);
+      lines.push(`📞 Not Received: ${notPickedCount}`);
+      lines.push(`❌ Can't Come: ${noCount}`);
+      if (otherCount > 0) lines.push(`⏰ Callback / Tentative: ${otherCount}`);
+      if (pendingCount > 0) lines.push(`⏳ Pending: ${pendingCount}`);
+    }
 
     return lines.join("\n");
   };
@@ -475,6 +505,29 @@ export default function CallingSewaPage() {
             <UserCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
             <span>Assign Multiple {selectedIds.length > 0 ? `(${selectedIds.length})` : ""}</span>
           </button>
+
+          {/* Import Calling Data Button */}
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="px-3 py-1.5 bg-white hover:bg-stone-50 border border-[#E5D8B8] text-[#08415C] text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition"
+            title="Import Excel or paste contacts directly into this calling batch"
+          >
+            <UploadCloud className="w-3.5 h-3.5 text-[#D4AF37]" />
+            <span>Import Data</span>
+          </button>
+
+          {/* WhatsApp Calling Report Button */}
+          <button
+            type="button"
+            onClick={() => setIsReportModalOpen(true)}
+            className="px-3 py-1.5 bg-emerald-50 hover:bg-[#25D366] text-emerald-800 hover:text-white border border-emerald-300 hover:border-[#25D366] text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition"
+            title="Generate and share calling report for WhatsApp"
+          >
+            <MessageSquare className="w-3.5 h-3.5 fill-current" />
+            <span>WhatsApp Report</span>
+          </button>
+
           {!showOtherUsers ? (
             <button
               type="button"
@@ -1358,9 +1411,20 @@ export default function CallingSewaPage() {
                 </span>
               )}
             </span>
-            <span className="text-[11px] text-[#00A896] font-semibold">
-              Historical record of all outreach calls &amp; responses
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-[#00A896] font-semibold hidden sm:inline">
+                Historical record of all outreach calls &amp; responses
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsReportModalOpen(true)}
+                className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition text-xs"
+                title="Generate and share WhatsApp report"
+              >
+                <MessageSquare className="w-3.5 h-3.5 fill-current" />
+                <span>Share Report on WhatsApp</span>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2.5">
@@ -1590,6 +1654,21 @@ export default function CallingSewaPage() {
         volunteers={volunteers}
         onSuccess={() => {
           setSelectedIds([]);
+          fetchData();
+        }}
+      />
+
+      {/* Import Calling Data Modal */}
+      <ImportCallingModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        availableCampaigns={availableCampaigns}
+        currentBatch={selectedCampaign}
+        volunteers={volunteers}
+        currentUserId={user?.id}
+        currentUserName={user?.name}
+        onSuccess={() => {
+          setIsImportModalOpen(false);
           fetchData();
         }}
       />

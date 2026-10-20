@@ -10,6 +10,7 @@ export async function POST(request: Request) {
 
     let imported = 0;
     let duplicates = 0;
+    let updated = 0;
 
     const hasVolunteers = Array.isArray(assignVolunteerIds) && assignVolunteerIds.length > 0;
 
@@ -33,10 +34,41 @@ export async function POST(request: Request) {
       });
 
       if (exists) {
-        duplicates++;
+        // If importing for calling with volunteer assignment or batch tag, update existing record
+        const updateData: any = {};
+        if (hasVolunteers) {
+          updateData.assignedVolunteerId = assignVolunteerIds[(imported + updated) % assignVolunteerIds.length];
+        }
+        if (tags) {
+          const currentTags = exists.tags ? exists.tags.split(",").map((t: string) => t.trim()) : [];
+          if (!currentTags.includes(tags.trim())) {
+            currentTags.push(tags.trim());
+            updateData.tags = currentTags.join(", ");
+          }
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          await prisma.person.update({
+            where: { id: exists.id },
+            data: updateData,
+          });
+
+          await prisma.timelineEvent.create({
+            data: {
+              personId: exists.id,
+              eventType: "NOTE",
+              title: "Calling List Updated via Import",
+              description: `Updated with source '${source}'${tags ? ` • Batch: '${tags}'` : ""}${updateData.assignedVolunteerId ? " • Assigned to caller" : ""}`,
+            },
+          });
+
+          updated++;
+        } else {
+          duplicates++;
+        }
       } else {
         const assignedVolunteerId = hasVolunteers
-          ? assignVolunteerIds[imported % assignVolunteerIds.length]
+          ? assignVolunteerIds[(imported + updated) % assignVolunteerIds.length]
           : null;
 
         const p = await prisma.person.create({
@@ -66,7 +98,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ imported, duplicates });
+    return NextResponse.json({ imported, duplicates, updated });
   } catch (error: any) {
     console.error("Import error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
